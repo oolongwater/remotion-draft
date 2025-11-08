@@ -22,6 +22,7 @@ import {
   getChildren,
   getNextNode,
   getPreviousNode,
+  loadVideoSession,
 } from "./types/TreeState";
 import { ClosingQuestionPayload, VideoSession } from "./types/VideoConfig";
 
@@ -38,6 +39,9 @@ export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>("landing");
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const [error, setError] = useState<string>("");
+  
+  // Cached session from localStorage
+  const [cachedSession, setCachedSession] = useState<VideoSession | null>(null);
 
   // Reference to the video element for programmatic control
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -72,6 +76,40 @@ export const App: React.FC = () => {
 
   // Auto-play toggle state (on by default)
   const [isAutoPlayEnabled, setIsAutoPlayEnabled] = useState(true);
+
+  /**
+   * Check for cached session on mount
+   * If found, skip landing page and go directly to learning state
+   */
+  useEffect(() => {
+    const cached = loadVideoSession();
+    if (cached) {
+      console.log('Loaded cached session from localStorage');
+      console.log('Cached tree has', cached.tree.nodes.size, 'nodes');
+      console.log('Saved current node ID:', cached.tree.currentNodeId);
+      
+      // Validate the saved currentNodeId - only reset if it's invalid
+      const isValidNode = cached.tree.currentNodeId && 
+                         cached.tree.nodes.has(cached.tree.currentNodeId);
+      
+      if (!isValidNode) {
+        // Only reset to first root if currentNodeId is empty or invalid
+        if (cached.tree.rootIds.length > 0) {
+          console.log('Invalid or missing currentNodeId, resetting to first root');
+          cached.tree.currentNodeId = cached.tree.rootIds[0];
+        } else {
+          console.error('No root nodes found in cached tree!');
+          return; // Don't load corrupted session
+        }
+      } else {
+        console.log('Restoring user to saved position:', cached.tree.currentNodeId);
+      }
+      
+      setCachedSession(cached);
+      setCurrentTopic(cached.context.initialTopic || "Cached Session");
+      setAppState("learning");
+    }
+  }, []);
 
   /**
    * Handle topic submission from landing page
@@ -283,6 +321,7 @@ export const App: React.FC = () => {
           initialTopic={currentTopic}
           onError={handleVideoError}
           isTestMode={isTestMode} // Pass test mode flag
+          initialSession={cachedSession || undefined} // Pass cached session if available
         >
           {({
             session,

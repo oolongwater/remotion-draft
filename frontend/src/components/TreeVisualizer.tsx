@@ -99,30 +99,33 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const nodePositions = new Map<string, { x: number; y: number }>();
     const nodeColumns = new Map<string, number>(); // Track which column each node is in
     
-    // BFS to get all nodes level by level
+    // BFS to get all nodes level by level, starting from all roots
     const queue: { node: TreeNode; level: number; column: number }[] = [];
-    if (tree.rootId) {
-      const root = tree.nodes.get(tree.rootId);
-      if (root) {
-        queue.push({ node: root, level: 0, column: 0 });
-        
-        while (queue.length > 0) {
-          const { node, level, column } = queue.shift()!;
-          
-          if (!nodeLevels[level]) nodeLevels[level] = [];
-          nodeLevels[level].push(node);
-          nodeColumns.set(node.id, column);
-          
-          // Add children
-          const children = getChildren(tree, node.id);
-          children.forEach((child, idx) => {
-            queue.push({ 
-              node: child, 
-              level: level + 1, 
-              column: column + idx // Each child gets offset column
-            });
-          });
+    if (tree.rootIds && tree.rootIds.length > 0) {
+      // Add all roots to queue
+      tree.rootIds.forEach((rootId, rootIndex) => {
+        const root = tree.nodes.get(rootId);
+        if (root) {
+          queue.push({ node: root, level: 0, column: rootIndex * 2 }); // Spread roots horizontally
         }
+      });
+      
+      while (queue.length > 0) {
+        const { node, level, column } = queue.shift()!;
+        
+        if (!nodeLevels[level]) nodeLevels[level] = [];
+        nodeLevels[level].push(node);
+        nodeColumns.set(node.id, column);
+        
+        // Add children
+        const children = getChildren(tree, node.id);
+        children.forEach((child, idx) => {
+          queue.push({ 
+            node: child, 
+            level: level + 1, 
+            column: column + idx // Each child gets offset column
+          });
+        });
       }
     }
     

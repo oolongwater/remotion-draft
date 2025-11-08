@@ -81,40 +81,119 @@ const nodeTypes = {
 };
 
 /**
- * Calculate hierarchical layout positions using a simple tree layout algorithm
- * Much more spread out for the full-screen view
+ * Calculate bounding box for a set of positioned nodes
  */
-function calculateTreeLayout(tree: LearningTree) {
-  const positions = new Map<string, { x: number; y: number }>();
-  const levelWidth = new Map<number, number>();
+function calculateTreeBounds(
+  positions: Map<string, { x: number; y: number }>,
+  nodeIds: string[]
+): { minX: number; maxX: number; minY: number; maxY: number } {
+  if (nodeIds.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  }
   
-  // Traverse tree level by level
-  function traverse(nodeId: string, level: number, parentX: number, childIndex: number, totalSiblings: number) {
-    const currentWidth = levelWidth.get(level) || 0;
-    levelWidth.set(level, currentWidth + 1);
-    
-    // Calculate x position based on parent and siblings - MUCH MORE SPACING
-    const horizontalSpacing = 400; // Wider spacing between siblings
-    const verticalSpacing = 250; // More vertical space between levels
-    const offsetX = (childIndex - (totalSiblings - 1) / 2) * horizontalSpacing + parentX;
-    
-    positions.set(nodeId, {
-      x: offsetX,
-      y: level * verticalSpacing,
-    });
-    
-    // Get children and traverse
-    const node = tree.nodes.get(nodeId);
-    if (node && node.childIds.length > 0) {
-      node.childIds.forEach((childId, index) => {
-        traverse(childId, level + 1, offsetX, index, node.childIds.length);
-      });
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  
+  for (const nodeId of nodeIds) {
+    const pos = positions.get(nodeId);
+    if (pos) {
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxY = Math.max(maxY, pos.y);
     }
   }
   
-  // Start from root - centered
-  if (tree.rootId) {
-    traverse(tree.rootId, 0, 0, 0, 1);
+  return { minX, maxX, minY, maxY };
+}
+
+/**
+ * Get all node IDs belonging to a specific root tree
+ */
+function getNodesInTree(tree: LearningTree, rootId: string): string[] {
+  const nodeIds: string[] = [];
+  
+  function traverse(nodeId: string) {
+    nodeIds.push(nodeId);
+    const node = tree.nodes.get(nodeId);
+    if (node && node.childIds.length > 0) {
+      node.childIds.forEach(childId => traverse(childId));
+    }
+  }
+  
+  traverse(rootId);
+  return nodeIds;
+}
+
+/**
+ * Calculate hierarchical layout positions for multi-root trees
+ * Uses collision-aware positioning to place roots dynamically
+ */
+function calculateTreeLayout(tree: LearningTree) {
+  const positions = new Map<string, { x: number; y: number }>();
+  const horizontalSpacing = 400; // Spacing between siblings
+  const verticalSpacing = 250; // Spacing between levels
+  const treeClearance = 400; // Minimum clearance between separate root trees
+  
+  // Traverse a single tree and return positions
+  function traverseTree(
+    rootId: string, 
+    offsetX: number, 
+    offsetY: number,
+    targetMap: Map<string, { x: number; y: number }>
+  ) {
+    const levelWidth = new Map<number, number>();
+    
+    function traverse(nodeId: string, level: number, parentX: number, childIndex: number, totalSiblings: number) {
+      const currentWidth = levelWidth.get(level) || 0;
+      levelWidth.set(level, currentWidth + 1);
+      
+      const localOffsetX = (childIndex - (totalSiblings - 1) / 2) * horizontalSpacing + parentX;
+      
+      targetMap.set(nodeId, {
+        x: localOffsetX + offsetX,
+        y: level * verticalSpacing + offsetY,
+      });
+      
+      const node = tree.nodes.get(nodeId);
+      if (node && node.childIds.length > 0) {
+        node.childIds.forEach((childId, index) => {
+          traverse(childId, level + 1, localOffsetX, index, node.childIds.length);
+        });
+      }
+    }
+    
+    traverse(rootId, 0, 0, 0, 1);
+  }
+  
+  // Position each root tree
+  if (!tree.rootIds || tree.rootIds.length === 0) return positions;
+  
+  // First root at origin
+  traverseTree(tree.rootIds[0], 0, 0, positions);
+  
+  // Position remaining roots with collision avoidance
+  for (let i = 1; i < tree.rootIds.length; i++) {
+    const rootId = tree.rootIds[i];
+    
+    // Layout tree temporarily at origin to calculate its bounds
+    const tempPositions = new Map<string, { x: number; y: number }>();
+    traverseTree(rootId, 0, 0, tempPositions);
+    const treeNodes = getNodesInTree(tree, rootId);
+    const treeBounds = calculateTreeBounds(tempPositions, treeNodes);
+    
+    // Find safe position to the right of all existing trees
+    let safeX = 0;
+    const existingNodeIds = Array.from(positions.keys());
+    if (existingNodeIds.length > 0) {
+      const existingBounds = calculateTreeBounds(positions, existingNodeIds);
+      safeX = existingBounds.maxX + treeClearance + Math.abs(treeBounds.minX);
+    }
+    
+    // Layout this tree at the safe position (now writing to positions)
+    traverseTree(rootId, safeX, 0, positions);
   }
   
   return positions;

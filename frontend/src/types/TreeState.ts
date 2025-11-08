@@ -9,6 +9,7 @@ import {
   TreeNode,
   LearningTree,
   VideoSegment,
+  VideoSession,
   LegacyVideoSession,
   generateNodeId,
 } from './VideoConfig';
@@ -25,7 +26,7 @@ export interface SerializedTree {
     branchIndex: number;
     branchLabel?: string;
   }>;
-  rootId: string;
+  rootIds: string[];
   currentNodeId: string;
 }
 
@@ -60,20 +61,37 @@ export function getParent(tree: LearningTree, nodeId: string): TreeNode | null {
 }
 
 /**
- * Calculate hierarchical node number (e.g., "1", "1.1", "1.2.3")
- * Walks up the parent chain and builds the number
+ * Calculate hierarchical node number with multi-root support
+ * Root nodes get numbered 1, 2, 3... based on their order in rootIds
+ * Children get numbered relative to their root: 2.1, 2.2.1, etc.
  */
 export function getNodeNumber(tree: LearningTree, nodeId: string): string {
   const node = getNode(tree, nodeId);
   if (!node) return '';
   
-  // Build path from root to this node
-  const path: number[] = [];
+  // Find which root tree this node belongs to
+  const pathToRoot = getPathFromRoot(tree, nodeId);
+  if (pathToRoot.length === 0) return '';
+  
+  const rootNode = pathToRoot[0];
+  const rootIndex = tree.rootIds.indexOf(rootNode.id);
+  
+  if (rootIndex === -1) return '';
+  
+  // Root number is 1-based
+  const rootNumber = rootIndex + 1;
+  
+  // If this IS the root node, just return the root number
+  if (node.id === rootNode.id) {
+    return rootNumber.toString();
+  }
+  
+  // Build path from root to this node (excluding root)
+  const path: number[] = [rootNumber];
   let currentNode: TreeNode | null = node;
   
-  while (currentNode) {
-    path.unshift(currentNode.branchIndex + 1); // +1 because branchIndex is 0-based
-    if (currentNode.parentId === null) break;
+  while (currentNode && currentNode.parentId !== null) {
+    path.splice(1, 0, currentNode.branchIndex + 1); // +1 because branchIndex is 0-based
     currentNode = getParent(tree, currentNode.id);
   }
   
@@ -160,11 +178,37 @@ export function initializeTree(segment: VideoSegment): LearningTree {
   const rootNode = createRootNode(segment);
   const tree: LearningTree = {
     nodes: new Map([[rootNode.id, rootNode]]),
-    rootId: rootNode.id,
+    rootIds: [rootNode.id],
     currentNodeId: rootNode.id,
   };
   
   return tree;
+}
+
+/**
+ * Add a new independent root node to an existing tree
+ * Used when creating a new topic tree that's separate from existing trees
+ */
+export function addRootNode(
+  tree: LearningTree,
+  segment: VideoSegment
+): TreeNode {
+  const newRootNode = createRootNode(segment);
+  
+  // Add to tree
+  tree.nodes.set(newRootNode.id, newRootNode);
+  tree.rootIds.push(newRootNode.id);
+  
+  return newRootNode;
+}
+
+/**
+ * Get all root nodes in the tree
+ */
+export function getAllRoots(tree: LearningTree): TreeNode[] {
+  return tree.rootIds
+    .map(rootId => getNode(tree, rootId))
+    .filter((node): node is TreeNode => node !== null);
 }
 
 /**
@@ -201,7 +245,7 @@ export function serializeTree(tree: LearningTree): SerializedTree {
   
   return {
     nodes,
-    rootId: tree.rootId,
+    rootIds: tree.rootIds,
     currentNodeId: tree.currentNodeId,
   };
 }
@@ -226,7 +270,7 @@ export function deserializeTree(data: SerializedTree): LearningTree {
   
   return {
     nodes,
-    rootId: data.rootId,
+    rootIds: data.rootIds,
     currentNodeId: data.currentNodeId,
   };
 }
@@ -270,7 +314,7 @@ export function convertLegacySession(legacySession: LegacyVideoSession): Learnin
   const tree = initializeTree(legacySession.segments[0]);
   
   // Add remaining segments as linear children
-  let currentNodeId = tree.rootId;
+  let currentNodeId = tree.rootIds[0];
   for (let i = 1; i < legacySession.segments.length; i++) {
     const newNode = addChildNode(tree, currentNodeId, legacySession.segments[i]);
     currentNodeId = newNode.id;
@@ -337,5 +381,51 @@ export function getNextNode(tree: LearningTree, nodeId: string): TreeNode | null
  */
 export function getPreviousNode(tree: LearningTree, nodeId: string): TreeNode | null {
   return getParent(tree, nodeId);
+}
+
+/**
+ * Save complete video session to localStorage
+ * Persists the entire session including tree and context
+ */
+export function saveVideoSession(session: VideoSession): void {
+  try {
+    const serializedTree = serializeTree(session.tree);
+    const sessionData = {
+      tree: serializedTree,
+      context: session.context,
+      sessionId: session.sessionId,
+      startedAt: session.startedAt,
+      lastUpdatedAt: session.lastUpdatedAt,
+    };
+    localStorage.setItem('current_video_session', JSON.stringify(sessionData));
+    console.log('Session saved to localStorage');
+  } catch (error) {
+    console.error('Failed to save session to localStorage:', error);
+  }
+}
+
+/**
+ * Load complete video session from localStorage
+ * Returns null if no session exists or if there's an error
+ */
+export function loadVideoSession(): VideoSession | null {
+  try {
+    const data = localStorage.getItem('current_video_session');
+    if (!data) return null;
+    
+    const sessionData = JSON.parse(data);
+    const tree = deserializeTree(sessionData.tree);
+    
+    return {
+      tree,
+      context: sessionData.context,
+      sessionId: sessionData.sessionId,
+      startedAt: sessionData.startedAt,
+      lastUpdatedAt: sessionData.lastUpdatedAt,
+    };
+  } catch (error) {
+    console.error('Failed to load session from localStorage:', error);
+    return null;
+  }
 }
 

@@ -19,8 +19,10 @@ import {
   getCurrentNode,
   initializeTree,
   addChildNode,
+  addRootNode,
   navigateToNode as navigateToNodeHelper,
   saveLearningTree,
+  saveVideoSession,
   getChildren,
   getNodeNumber,
 } from '../types/TreeState';
@@ -69,6 +71,7 @@ interface VideoControllerProps {
   onError?: (error: string) => void;
   children: (state: VideoControllerState) => React.ReactNode;
   isTestMode?: boolean; // NEW: Use hardcoded test data instead of generating
+  initialSession?: VideoSession; // NEW: Cached session to restore from localStorage
 }
 
 // ===== TEST DATA - EASILY REMOVABLE =====
@@ -107,7 +110,7 @@ function createTestSession(topic: string): VideoSession {
     renderingStatus: 'completed',
   };
   
-  addChildNode(tree, tree.rootId, segment2);
+  addChildNode(tree, tree.rootIds[0], segment2);
   
   return {
     tree,
@@ -135,12 +138,18 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   onError,
   children,
   isTestMode = false, // Default to normal mode
+  initialSession, // Cached session from localStorage
 }) => {
   // Session state
   // ===== TEST MODE - EASILY REMOVABLE =====
-  const [session, setSession] = useState<VideoSession>(() =>
-    isTestMode ? createTestSession(initialTopic) : createVideoSession(initialTopic)
-  );
+  const [session, setSession] = useState<VideoSession>(() => {
+    // Priority: initialSession > testMode > new session
+    if (initialSession) {
+      console.log('Using cached session from localStorage');
+      return initialSession;
+    }
+    return isTestMode ? createTestSession(initialTopic) : createVideoSession(initialTopic);
+  });
   // ===== END TEST MODE =====
   
   // Loading states
@@ -169,6 +178,12 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       return;
     }
     // ===== END TEST MODE =====
+    
+    // Skip generation if session already has nodes (loaded from cache)
+    if (initialSession && session.tree.nodes.size > 0) {
+      console.log('Using cached session - skipping initial generation');
+      return;
+    }
     
     // Check if tree is empty (no root node)
     if (session.tree.nodes.size === 0 && !isGenerating) {
@@ -236,21 +251,23 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         
         // Build tree structure: first segment is root, rest are linear children
         const tree = initializeTree(segments[0]);
-        let currentNodeId = tree.rootId;
+        let currentNodeId = tree.rootIds[0];
         
         for (let i = 1; i < segments.length; i++) {
           const newNode = addChildNode(tree, currentNodeId, segments[i]);
           currentNodeId = newNode.id;
         }
         
-        setSession((prev) => ({
-          ...prev,
+        const updatedSession = {
+          ...session,
           tree,
           lastUpdatedAt: new Date().toISOString(),
-        }));
+        };
         
-        // Save to localStorage
-        saveLearningTree(session.sessionId, tree);
+        setSession(updatedSession);
+        
+        // Save complete session to localStorage
+        saveVideoSession(updatedSession);
         
         console.log(`Generated tree with ${segments.length} video segments`);
       } else {
@@ -316,33 +333,28 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           correctnessPattern: newPattern,
         });
         
-        setSession((prev) => {
-          const updatedSegments = prev.segments.map((segment, idx) => {
-            if (idx === prev.currentIndex) {
-              return {
-                ...segment,
-                userAnswer: answer,
-              };
-            }
-            return segment;
-          });
-
-          return {
-            ...prev,
-            segments: updatedSegments,
-            context: updatedContext,
-            lastUpdatedAt: new Date().toISOString(),
-          };
-        });
+        // Store user answer on current node's segment
+        currentNode.segment.userAnswer = answer;
         
+        const updatedSession = {
+          ...session,
+          context: updatedContext,
+          lastUpdatedAt: new Date().toISOString(),
+        };
+        
+        setSession(updatedSession);
         setIsEvaluating(false);
+        
+        // Save the session with the updated answer
+        saveVideoSession(updatedSession);
         
         // Navigate to first child if it exists
         const children = getChildren(session.tree, currentNode.id);
         if (children.length > 0) {
           navigateToNodeHelper(session.tree, children[0].id);
-          setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
-          saveLearningTree(session.sessionId, session.tree);
+          const navUpdatedSession = { ...updatedSession, lastUpdatedAt: new Date().toISOString() };
+          setSession(navUpdatedSession);
+          saveVideoSession(navUpdatedSession);
         } else {
           console.log('Reached leaf node after answering');
         }
@@ -370,8 +382,9 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     const children = getChildren(session.tree, currentNode.id);
     if (children.length > 0) {
       navigateToNodeHelper(session.tree, children[0].id);
-      setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
-      saveLearningTree(session.sessionId, session.tree);
+      const updatedSession = { ...session, lastUpdatedAt: new Date().toISOString() };
+      setSession(updatedSession);
+      saveVideoSession(updatedSession);
     } else {
       console.log('Reached leaf node - no more segments');
     }
@@ -379,15 +392,10 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   
   /**
    * Request a completely new topic (pivot)
-   * Generates all scenes for the new topic and adds as branch from current node
+   * Creates a new independent root tree instead of branching
    */
   const requestNewTopic = useCallback(
     async (newTopic: string) => {
-      if (!currentNode) {
-        console.warn('No current node to branch from');
-        return;
-      }
-      
       setIsGenerating(true);
       setError(null);
       setGenerationProgress(undefined);
@@ -444,34 +452,31 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             };
           });
           
-          // Add new segments as branch from current node
-          const firstNewNode = addChildNode(
-            session.tree,
-            currentNode.id,
-            newSegments[0],
-            `Topic: ${newTopic}`
-          );
+          // Create new independent root tree
+          const newRootNode = addRootNode(session.tree, newSegments[0]);
           
-          // Add remaining segments as linear children
-          let currentBranchNodeId = firstNewNode.id;
+          // Add remaining segments as linear children of the new root
+          let currentBranchNodeId = newRootNode.id;
           for (let i = 1; i < newSegments.length; i++) {
             const newNode = addChildNode(session.tree, currentBranchNodeId, newSegments[i]);
             currentBranchNodeId = newNode.id;
           }
           
-          // Navigate to first new node
-          navigateToNodeHelper(session.tree, firstNewNode.id);
+          // Navigate to the new root node
+          navigateToNodeHelper(session.tree, newRootNode.id);
           
-          setSession((prev) => ({
-            ...prev,
+          const updatedSession = {
+            ...session,
             context: newContext,
             lastUpdatedAt: new Date().toISOString(),
-          }));
+          };
           
-          // Save to localStorage
-          saveLearningTree(session.sessionId, session.tree);
+          setSession(updatedSession);
           
-          console.log(`Generated branch with ${newSegments.length} video segments for new topic: ${newTopic}`);
+          // Save complete session to localStorage
+          saveVideoSession(updatedSession);
+          
+          console.log(`Created new root tree with ${newSegments.length} video segments for topic: ${newTopic}`);
         } else {
           const errorMsg = result.error || 'Failed to generate video scenes for new topic';
           setError(errorMsg);
@@ -486,7 +491,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         setGenerationProgress(undefined);
       }
     },
-    [currentNode, session, onError]
+    [session, onError]
   );
   
   /**
@@ -495,8 +500,9 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   const navigateToNode = useCallback((nodeId: string) => {
     try {
       navigateToNodeHelper(session.tree, nodeId);
-      setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
-      saveLearningTree(session.sessionId, session.tree);
+      const updatedSession = { ...session, lastUpdatedAt: new Date().toISOString() };
+      setSession(updatedSession);
+      saveVideoSession(updatedSession);
     } catch (err) {
       console.error('Failed to navigate to node:', err);
     }
@@ -541,6 +547,9 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       let firstNewNodeId: string | null = null;
       let currentParentNodeId = currentNode.id;
       
+      // Store all generated segments first, then add to tree at once
+      const generatedSegments: VideoSegment[] = [];
+      
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i];
         console.log(`Generating video ${i + 1}/${phases.length}: ${phase.sub_topic}`);
@@ -584,11 +593,23 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             renderingStatus: 'completed',
           };
           
-          // Add as child node with sub_topic as label
+          generatedSegments.push(newSegment);
+          console.log(`✓ Generated video ${i + 1}: ${phase.sub_topic}`);
+        } else {
+          const errorMsg = result.error || `Failed to generate video for: ${phase.sub_topic}`;
+          console.error(errorMsg);
+          // Continue with remaining phases even if one fails
+        }
+      }
+      
+      // Step 3: Add all generated segments to tree in one batch
+      if (generatedSegments.length > 0) {
+        for (let i = 0; i < generatedSegments.length; i++) {
+          const phase = phases[i];
           const newNode = addChildNode(
             session.tree,
             currentParentNodeId,
-            newSegment,
+            generatedSegments[i],
             phase.sub_topic
           );
           
@@ -599,22 +620,21 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           
           // For linear chain: next phase branches from this node
           currentParentNodeId = newNode.id;
-          
-          console.log(`✓ Created node ${i + 1}: ${phase.sub_topic}`);
-        } else {
-          const errorMsg = result.error || `Failed to generate video for: ${phase.sub_topic}`;
-          console.error(errorMsg);
-          // Continue with remaining phases even if one fails
+          console.log(`✓ Added node ${i + 1} to tree: ${phase.sub_topic}`);
         }
-      }
-      
-      // Step 3: Navigate to first video in the branch
-      if (firstNewNodeId) {
-        navigateToNodeHelper(session.tree, firstNewNodeId);
-        setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
-        saveLearningTree(session.sessionId, session.tree);
         
-        console.log(`✓ Question branch created with ${phases.length} videos`);
+        // Navigate to first video in the branch
+        navigateToNodeHelper(session.tree, firstNewNodeId!);
+        
+        // Create updated session and save
+        const updatedSession = { 
+          ...session, 
+          lastUpdatedAt: new Date().toISOString() 
+        };
+        setSession(updatedSession);
+        saveVideoSession(updatedSession);
+        
+        console.log(`✓ Question branch created with ${generatedSegments.length} videos`);
         console.log(`Navigated to first video: ${phases[0].sub_topic}`);
       } else {
         setError('Failed to create any videos for the question');

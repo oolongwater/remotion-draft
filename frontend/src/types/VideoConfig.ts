@@ -71,10 +71,11 @@ export interface TreeNode {
 /**
  * Learning tree structure using flat Map + Adjacency List
  * Enables O(1) lookups and easy serialization
+ * Supports multiple independent root nodes for separate learning paths
  */
 export interface LearningTree {
   nodes: Map<string, TreeNode>; // Fast lookup by ID
-  rootId: string;
+  rootIds: string[]; // Array of root node IDs for multiple independent trees
   currentNodeId: string;
 }
 
@@ -219,7 +220,7 @@ export function createVideoSession(initialTopic: string): VideoSession {
   // Create empty tree (will be populated when first segment is generated)
   const tree: LearningTree = {
     nodes: new Map(),
-    rootId: "",
+    rootIds: [],
     currentNodeId: "",
   };
 
