@@ -67,6 +67,7 @@ image = (
     )
     .pip_install(
         "requests>=2.31.0",
+        "aiohttp>=3.9.0",  # For async HTTP requests (parallel audio generation)
         "python-dotenv>=0.21.0",
         "manim==0.18.1",
         "manim-voiceover[transcribe]>=0.3.0",  # Include transcription extra to prevent EOFError prompts

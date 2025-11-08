@@ -220,6 +220,50 @@ class ElevenLabsTimedService(SpeechService):
         except requests.exceptions.RequestException as e:
             raise Exception(f"ElevenLabs API error: {e}")
 
+    async def _call_elevenlabs_api_async(self, text: str) -> Dict:
+        """
+        Call ElevenLabs API with timing support (async version).
+
+        Args:
+            text: Text to convert to speech
+
+        Returns:
+            API response with audio and timing data
+        """
+        import aiohttp
+        
+        url = f"{self.base_url}/text-to-speech/{self.voice_id}/with-timestamps"
+
+        headers = {
+            "xi-api-key": self.api_key,
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "text": text,
+            "model_id": self.model_id,
+            "voice_settings": self.voice_settings
+        }
+
+        try:
+            print(f"🔊 [ElevenLabs Async] Generating audio for text: {text[:50]}...")
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as response:
+                    print(f"📡 [ElevenLabs Async] API response status: {response.status}")
+                    
+                    if response.status != 200:
+                        error_text = await response.text()
+                        raise Exception(f"ElevenLabs API error: {response.status} - {error_text}")
+                    
+                    result = await response.json()
+                    print(f"✅ [ElevenLabs Async] Audio generated successfully")
+                    
+                    return result
+
+        except Exception as e:
+            raise Exception(f"ElevenLabs API error: {e}")
+
     def generate_from_text(self, text: str, cache_dir: Optional[str] = None,
                           path: Optional[str] = None) -> Dict:
         """
@@ -354,6 +398,127 @@ class ElevenLabsTimedService(SpeechService):
         print(f"💰 [ElevenLabs] Cost: ${text_cost:.4f} ({len(text)} characters)")
 
         return result
+
+    async def generate_from_text_async(self, text: str, cache_dir: Optional[str] = None,
+                                      path: Optional[str] = None) -> Dict:
+        """
+        Generate audio from text with timing information (async version).
+
+        Args:
+            text: Text to convert to speech
+            cache_dir: Directory for cached audio files
+            path: Optional specific path for the audio file
+
+        Returns:
+            Dictionary containing audio file info, timing data, and metadata
+        """
+        if cache_dir is None:
+            cache_dir = self.cache_dir
+
+        # Ensure cache directory exists
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+
+        # Create input data for hashing
+        input_data = {
+            "input_text": text,
+            "service": "elevenlabs_timed",
+            "voice_id": self.voice_id,
+            "model_id": self.model_id,
+            "voice_settings": self.voice_settings
+        }
+
+        # Check for cached result (simplified caching)
+        hash_key = self.get_data_hash(input_data)
+        cached_audio_path = Path(cache_dir) / f"{hash_key}.mp3"
+
+        if cached_audio_path.exists():
+            print(f"📋 [ElevenLabs Async] Using cached audio for: {text[:30]}...")
+            # Try to load timing data
+            timing_file = cached_audio_path.with_suffix('.timing.json')
+            word_timings = []
+            character_alignment = {}
+
+            if timing_file.exists():
+                try:
+                    timing_data = json.loads(timing_file.read_text())
+                    word_timings = timing_data.get('word_timings', [])
+                    character_alignment = timing_data.get('character_alignment', {})
+                except:
+                    pass
+
+            cached_cost = self.calculate_cost(text)
+
+            return {
+                "input_text": text,
+                "input_data": input_data,
+                "original_audio": str(cached_audio_path),
+                "audio_path": str(cached_audio_path),
+                "word_timings": word_timings,
+                "character_alignment": character_alignment,
+                "service": "elevenlabs_timed",
+                "cost": cached_cost,
+                "character_count": len(text),
+                "from_cache": True
+            }
+
+        # Generate new audio via API
+        print(f"🎯 [ElevenLabs Async] Generating fresh audio via API...")
+        api_response = await self._call_elevenlabs_api_async(text)
+
+        # Decode audio from base64
+        if 'audio_base64' in api_response:
+            audio_bytes = base64.b64decode(api_response['audio_base64'])
+            print(f"🎵 [ElevenLabs Async] Audio decoded, size: {len(audio_bytes)} bytes")
+        else:
+            raise Exception("ElevenLabs API response missing audio data")
+
+        # Determine output path
+        if path is None:
+            audio_filename = self.get_data_hash(input_data) + ".mp3"
+        else:
+            audio_filename = path
+
+        audio_path = Path(cache_dir) / Path(audio_filename).name
+        print(f"📂 [ElevenLabs Async] Saving to: {audio_path}")
+
+        # Save audio file
+        audio_path.write_bytes(audio_bytes)
+        print(f"💾 [ElevenLabs Async] Audio file saved successfully ({audio_path.stat().st_size} bytes)")
+
+        # Extract timing information
+        alignment = api_response.get('alignment', {})
+        characters = alignment.get('characters', [])
+        char_start_times = alignment.get('character_start_times_seconds', [])
+        char_end_times = alignment.get('character_end_times_seconds', [])
+
+        # Convert to word-level timing
+        word_timings = self._extract_word_timings(characters, char_start_times, char_end_times)
+        print(f"📝 [ElevenLabs Async] Extracted {len(word_timings)} word timings")
+
+        # Save timing data
+        timing_file = audio_path.with_suffix('.timing.json')
+        timing_data = {
+            "text": text,
+            "word_timings": word_timings,
+            "character_alignment": alignment
+        }
+        timing_file.write_text(json.dumps(timing_data, indent=2))
+
+        text_cost = self.calculate_cost(text)
+        print(f"💰 [ElevenLabs Async] Cost: ${text_cost:.4f} ({len(text)} characters)")
+
+        return {
+            "input_text": text,
+            "input_data": input_data,
+            "original_audio": str(audio_filename),
+            "audio_path": str(audio_path),
+            "word_timings": word_timings,
+            "character_alignment": alignment,
+            "service": "elevenlabs_timed",
+            "cost": text_cost,
+            "character_count": len(text),
+            "from_cache": False
+        }
 
     def get_available_voices(self) -> List[Dict]:
         """

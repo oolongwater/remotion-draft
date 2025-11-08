@@ -288,7 +288,7 @@ Return ONLY the fixed Python code."""
             file_size = section_video.stat().st_size / (1024 * 1024)
             print(f"✓ [Container {section_num}] Video rendered successfully ({file_size:.2f} MB)")
 
-            # Upload to GCS
+            # Upload to GCS (individual sections needed by user)
             try:
                 from services.gcs_storage import upload_scene_video
                 upload_result = upload_scene_video(str(section_video), job_id, section_num)
@@ -299,11 +299,9 @@ Return ONLY the fixed Python code."""
             except Exception as e:
                 print(f"⚠️  [Container {section_num}] GCS upload error (non-fatal): {type(e).__name__}: {e}")
 
-            # Commit volume changes so main function can access the file
-            from modal import Volume
-            volume = Volume.from_name("video-outputs-main-dev")
-            volume.commit()
-            print(f"✓ [Container {section_num}] Volume changes committed")
+            # OPTIMIZATION: Skip individual volume commits (saves 5-10 seconds total)
+            # Single volume reload in main function is sufficient
+            print(f"✓ [Container {section_num}] Skipping volume commit (optimization enabled)")
 
             return (section_num, str(section_video), None)
 

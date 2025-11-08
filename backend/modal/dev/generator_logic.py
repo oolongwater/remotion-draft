@@ -4,7 +4,7 @@ Pure Python logic without Modal decorators
 Handles the complete workflow: planning, code generation, rendering, upload
 """
 
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from .config import (
     MAX_TOKENS,
@@ -234,6 +234,106 @@ def generate_educational_video_logic(
             "plan": mega_plan
         })
 
+        # STAGE 1.5: Pre-generate ALL Audio in Parallel (OPTIMIZATION)
+        print(f"\n{'─'*60}")
+        print("🎤 STAGE 1.5: Pre-generating Audio in Parallel")
+        print(f"{'─'*60}")
+        print(f"   Generating audio for {len(video_structure)} sections...")
+        capture_log(f"STAGE 1.5: Pre-generating audio for {len(video_structure)} sections")
+
+        yield update_job_progress({
+            "status": "processing",
+            "stage": 1.5,
+            "stage_name": "Audio Generation",
+            "progress_percentage": 18,
+            "message": f"Pre-generating audio for {len(video_structure)} sections in parallel...",
+            "job_id": job_id
+        })
+
+        # Import asyncio for parallel audio generation
+        import asyncio
+        
+        # Create TTS service
+        from services.tts import ElevenLabsTimedService
+        tts_service = ElevenLabsTimedService(
+            voice_id="pqHfZKP75CvOlQylNhV4",
+            transcription_model=None
+        )
+
+        # Create audio directory
+        audio_dir = work_dir / "audio"
+        audio_dir.mkdir(exist_ok=True)
+
+        async def generate_section_audio(section_info):
+            """Generate audio for a single section."""
+            i, section = section_info
+            section_num = i + 1
+            
+            try:
+                # Use section content as narration text
+                narration_text = section.get('content', '')
+                
+                # If content is just a summary, create a more detailed narration
+                if len(narration_text) < 50:
+                    narration_text = f"{section['section']}. {narration_text}"
+                
+                print(f"🎤 [Audio {section_num}] Generating audio for section: {section['section']}")
+                print(f"   Text length: {len(narration_text)} characters")
+                
+                # Generate audio using async API
+                audio_result = await tts_service.generate_from_text_async(
+                    text=narration_text,
+                    cache_dir=str(audio_dir),
+                    path=f"section_{section_num}.mp3"
+                )
+                
+                audio_path = audio_result.get('audio_path', '')
+                print(f"✅ [Audio {section_num}] Audio generated: {Path(audio_path).name}")
+                
+                return (section_num, audio_path, narration_text, None)
+                
+            except Exception as e:
+                print(f"❌ [Audio {section_num}] Audio generation failed: {e}")
+                import traceback
+                print(traceback.format_exc())
+                return (section_num, None, None, str(e))
+
+        async def generate_all_audio_parallel():
+            """Generate ALL audio files in parallel."""
+            print(f"🎯 Starting PARALLEL audio generation for {len(video_structure)} sections...")
+            tasks = [generate_section_audio((i, section)) for i, section in enumerate(video_structure)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            return results
+
+        # Execute parallel audio generation
+        audio_results = asyncio.run(generate_all_audio_parallel())
+        
+        # Build audio mapping: section_num -> (audio_path, narration_text)
+        audio_map = {}
+        successful_audio = 0
+        for section_num, audio_path, narration_text, error in audio_results:
+            if audio_path and not error:
+                audio_map[section_num] = {
+                    'audio_path': audio_path,
+                    'narration_text': narration_text
+                }
+                successful_audio += 1
+                print(f"✓ Section {section_num} audio ready: {Path(audio_path).name}")
+            else:
+                print(f"⚠️  Section {section_num} audio failed: {error}")
+                # Continue without audio - will fall back to TTS during rendering
+                audio_map[section_num] = None
+
+        print(f"\n✓ Audio generation complete: {successful_audio} / {len(video_structure)} sections")
+        print(f"   Audio files saved in: {audio_dir}")
+
+        yield update_job_progress({
+            "status": "processing",
+            "progress_percentage": 22,
+            "message": f"Pre-generated audio for {successful_audio}/{len(video_structure)} sections",
+            "job_id": job_id
+        })
+
         # STAGE 2: Pipelined Code Generation + Rendering
         print(f"\n{'─'*60}")
         print("🎨 STAGE 2: Pipelined Code Generation → Rendering")
@@ -248,9 +348,7 @@ def generate_educational_video_logic(
             "job_id": job_id
         })
 
-        # Track spawned render jobs
-        import asyncio
-
+        # Track spawned render jobs (asyncio already imported above for audio generation)
         render_function_calls = []
 
         async def generate_code_async(section_info):
@@ -263,13 +361,58 @@ def generate_educational_video_logic(
                 print(f"📹 [Async {section_num}] Section {section_num}/{len(video_structure)}: {section['section']}")
                 print(f"{'━'*60}")
 
+                # Check if we have pre-generated audio for this section
+                audio_info = audio_map.get(section_num)
+                audio_instruction = ""
+                
+                if audio_info:
+                    audio_path = audio_info['audio_path']
+                    narration_text = audio_info['narration_text']
+                    
+                    print(f"🎤 [Async {section_num}] Using pre-generated audio: {Path(audio_path).name}")
+                    
+                    audio_instruction = f"""
+
+IMPORTANT - PRE-GENERATED AUDIO:
+Audio has been pre-generated for this section. You MUST use it as follows:
+
+1. DO NOT initialize ElevenLabsService or any TTS service
+2. DO NOT use self.set_speech_service()
+3. Instead, use the audio file directly with add_voiceover():
+
+from manim_voiceover.helper import create_voiceover_tracker
+from pathlib import Path
+
+class YourScene(Scene):  # Use Scene, not VoiceoverScene
+    def construct(self):
+        # Load pre-generated audio
+        audio_path = Path("/outputs/{job_id}/audio/section_{section_num}.mp3")
+        
+        # Add voiceover tracker
+        tracker = create_voiceover_tracker(self, audio_path)
+        
+        # Use tracker to sync animations with audio
+        with tracker.voiceover(text="{narration_text[:100]}...") as voiceover:
+            # Your animations here
+            pass
+
+The narration text for this section is:
+"{narration_text}"
+
+Use this exact text in the voiceover tracker for proper synchronization.
+"""
+                else:
+                    print(f"⚠️  [Async {section_num}] No pre-generated audio, will use TTS during rendering")
+                    audio_instruction = "\n\nNote: Generate voiceover using ElevenLabsService as usual."
+
                 section_prompt = f"""{MANIM_META_PROMPT}
 
 Topic: {prompt}
 Section: {section['section']} (Duration: {section['duration']})
 Content: {section['content']}
 
-Generate a SINGLE scene for this section only. The scene should be self-contained and match the duration specified."""
+Generate a SINGLE scene for this section only. The scene should be self-contained and match the duration specified.
+{audio_instruction}"""
 
                 # Add image context note if provided
                 if image_context:
@@ -279,12 +422,11 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 print(f"   Model: {code_model}")
                 print(f"   Temperature: {TEMP}")
                 print(f"   Max tokens: {MAX_TOKENS}")
+                if audio_info:
+                    print(f"   🎤 Using pre-generated audio: section_{section_num}.mp3")
                 if image_context:
                     print(f"   🖼️  Image context provided (will be described in text)")
-                    print(f"   ⚠️  Note: Cerebras may not support multimodal images")
 
-                # Note: Cerebras may not support multimodal images like Anthropic
-                # For now, we'll use text-only generation even when image_context is provided
                 # Text-only API call using llm service - ALL happen in parallel!
                 manim_code = await code_llm_service.generate_simple_async(
                     prompt=section_prompt,
@@ -303,7 +445,6 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 print(f"   Contains ```python block: {has_python_block}")
                 print(f"   Contains ``` block: {has_code_block}")
                 
-                original_code = manim_code
                 if '```python' in manim_code:
                     print(f"   Extracting code from ```python block...")
                     manim_code = manim_code.split('```python')[1].split('```')[0].strip()
@@ -463,7 +604,7 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
 
             try:
                 print(f"   Running ffmpeg concatenation...")
-                result = subprocess.run(
+                subprocess.run(
                     [
                         "ffmpeg",
                         "-f", "concat",
