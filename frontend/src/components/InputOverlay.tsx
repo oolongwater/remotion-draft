@@ -8,6 +8,7 @@
  */
 
 import { useState, FormEvent } from "react";
+import { BranchButton } from "./BranchButton";
 
 interface InputOverlayProps {
   hasQuestion: boolean;
@@ -18,6 +19,8 @@ interface InputOverlayProps {
   onRequestNext: () => void;
   onNewTopic: (topic: string) => void;
   onReset: () => void;
+  onCreateBranch: (branchLabel?: string) => void;
+  currentNodeNumber: string;
 }
 
 export const InputOverlay: React.FC<InputOverlayProps> = ({
@@ -29,6 +32,8 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
   onRequestNext,
   onNewTopic,
   onReset,
+  onCreateBranch,
+  currentNodeNumber,
 }) => {
   const [input, setInput] = useState("");
   const [showNewTopicInput, setShowNewTopicInput] = useState(false);
@@ -144,20 +149,30 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
           </form>
 
           {/* Additional Actions */}
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={() => setShowNewTopicInput(true)}
-              className="text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              Switch Topic
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              onClick={onReset}
-              className="text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              Start Over
-            </button>
+          <div className="mt-4 flex flex-col gap-3">
+            {/* Branch Button */}
+            <BranchButton
+              onBranch={onCreateBranch}
+              disabled={isEvaluating || isGenerating}
+            />
+            
+            <div className="flex gap-2 text-sm">
+              <span className="text-slate-500">At node {currentNodeNumber}</span>
+              <span className="text-slate-600">•</span>
+              <button
+                onClick={() => setShowNewTopicInput(true)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                Switch Topic
+              </button>
+              <span className="text-slate-600">•</span>
+              <button
+                onClick={onReset}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                Start Over
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -166,33 +181,47 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
 
   // No question mode - show continue/new topic options
   return (
-    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-      <div className="bg-slate-800/95 backdrop-blur-md border border-slate-700 rounded-2xl px-6 py-4 shadow-2xl">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onRequestNext}
+    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-3xl px-4">
+      <div className="bg-slate-800/95 backdrop-blur-md border border-slate-700 rounded-2xl p-6 shadow-2xl">
+        <div className="flex flex-col gap-4">
+          {/* Main actions */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onRequestNext}
+              disabled={isGenerating}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center gap-2"
+            >
+              <span>Continue Learning</span>
+              <span>→</span>
+            </button>
+            
+            <div className="h-8 w-px bg-slate-600" />
+            
+            <button
+              onClick={() => setShowNewTopicInput(true)}
+              className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+            >
+              New Topic
+            </button>
+            
+            <button
+              onClick={onReset}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Start Over
+            </button>
+          </div>
+          
+          {/* Branch Button */}
+          <BranchButton
+            onBranch={onCreateBranch}
             disabled={isGenerating}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center gap-2"
-          >
-            <span>Continue Learning</span>
-            <span>→</span>
-          </button>
+          />
           
-          <div className="h-8 w-px bg-slate-600" />
-          
-          <button
-            onClick={() => setShowNewTopicInput(true)}
-            className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
-          >
-            New Topic
-          </button>
-          
-          <button
-            onClick={onReset}
-            className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-          >
-            Start Over
-          </button>
+          {/* Node info */}
+          <div className="text-xs text-slate-500 text-center">
+            Currently at node: {currentNodeNumber}
+          </div>
         </div>
       </div>
     </div>

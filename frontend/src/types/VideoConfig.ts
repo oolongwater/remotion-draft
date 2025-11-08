@@ -54,10 +54,49 @@ export interface LearningContext {
 }
 
 /**
+ * Tree node wrapping a video segment with parent/child relationships
+ * Used for git-like branching navigation
+ */
+export interface TreeNode {
+  id: string;
+  segment: VideoSegment;
+  parentId: string | null; // null for root
+  childIds: string[]; // Array of child node IDs
+  branchIndex: number; // Which branch from parent (0, 1, 2...)
+  branchLabel?: string; // "Answer 1", "Question: Why?"
+}
+
+/**
+ * Learning tree structure using flat Map + Adjacency List
+ * Enables O(1) lookups and easy serialization
+ */
+export interface LearningTree {
+  nodes: Map<string, TreeNode>; // Fast lookup by ID
+  rootId: string;
+  currentNodeId: string;
+}
+
+/**
  * The complete video session state
  * Represents the entire learning journey
  */
 export interface VideoSession {
+  // Tree structure for branching navigation
+  tree: LearningTree;
+  
+  // Learning context for generating next segments
+  context: LearningContext;
+  
+  // Session metadata
+  sessionId: string;
+  startedAt: string;
+  lastUpdatedAt: string;
+}
+
+/**
+ * @deprecated Legacy linear session structure - use tree-based VideoSession instead
+ */
+export interface LegacyVideoSession {
   // All video segments generated in this session
   segments: VideoSegment[];
   
@@ -129,9 +168,30 @@ export function updateContext(
 }
 
 /**
- * Helper function to create a new video session
+ * Helper function to create a new tree-based video session
  */
 export function createVideoSession(initialTopic: string): VideoSession {
+  // Create empty tree (will be populated when first segment is generated)
+  const tree: LearningTree = {
+    nodes: new Map(),
+    rootId: '',
+    currentNodeId: '',
+  };
+  
+  return {
+    tree,
+    context: createInitialContext(initialTopic),
+    sessionId: generateSessionId(),
+    startedAt: new Date().toISOString(),
+    lastUpdatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Helper function to create a legacy linear video session
+ * @deprecated Use createVideoSession instead
+ */
+export function createLegacyVideoSession(initialTopic: string): LegacyVideoSession {
   return {
     segments: [],
     currentIndex: 0,
@@ -147,6 +207,13 @@ export function createVideoSession(initialTopic: string): VideoSession {
  */
 function generateSessionId(): string {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Generate a unique node ID
+ */
+export function generateNodeId(): string {
+  return `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 // Legacy types kept for backward compatibility during migration

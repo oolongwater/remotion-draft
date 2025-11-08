@@ -13,6 +13,8 @@ import { InputOverlay } from "./components/InputOverlay";
 import { LandingPage } from "./components/LandingPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorDisplay } from "./components/ErrorDisplay";
+import { TreeVisualizer } from "./components/TreeVisualizer";
+import { TreeExplorer } from "./components/TreeExplorer";
 
 /**
  * App state types
@@ -37,6 +39,9 @@ export const App: React.FC = () => {
   // ===== TEST MODE - EASILY REMOVABLE =====
   const [isTestMode, setIsTestMode] = useState(false);
   // ===== END TEST MODE =====
+  
+  // Tree explorer modal state
+  const [showTreeExplorer, setShowTreeExplorer] = useState(false);
 
   /**
    * Handle topic submission from landing page
@@ -116,18 +121,22 @@ export const App: React.FC = () => {
           {({
             session,
             currentSegment,
+            currentNodeNumber,
             isGenerating,
             isEvaluating,
             error: videoError,
             handleAnswer,
             requestNextSegment,
             requestNewTopic,
-            goToSegment,
+            navigateToNode,
+            createBranch,
           }) => {
             // Debug info in console
             console.log('VideoController State:', {
-              hasSegments: session.segments.length,
+              treeSize: session.tree.nodes.size,
+              currentNode: session.tree.currentNodeId,
               currentSegment: currentSegment?.id,
+              nodeNumber: currentNodeNumber,
               isGenerating,
               videoError,
               context: session.context,
@@ -200,31 +209,20 @@ export const App: React.FC = () => {
                     <span className="font-semibold text-blue-400">{currentSegment.topic}</span>
                   </div>
                   <div className="mt-1">
-                    <span className="text-slate-400">Segment: </span>
-                    <span className="text-slate-300">{session.currentIndex + 1} of {session.segments.length}</span>
+                    <span className="text-slate-400">Node: </span>
+                    <span className="text-slate-300">{currentNodeNumber}</span>
                     <span className="ml-2 text-slate-400">Depth: </span>
                     <span className="text-slate-300">{session.context.depth}</span>
                   </div>
                 </div>
                 
-                {/* Navigation through history */}
-                {session.segments.length > 1 && (
-                  <div className="absolute top-4 right-4 bg-slate-800/80 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-sm z-50 border border-slate-700 flex gap-2">
-                    <button
-                      onClick={() => goToSegment(Math.max(0, session.currentIndex - 1))}
-                      disabled={session.currentIndex === 0}
-                      className="px-2 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded"
-                    >
-                      ←
-                    </button>
-                    <button
-                      onClick={() => goToSegment(Math.min(session.segments.length - 1, session.currentIndex + 1))}
-                      disabled={session.currentIndex === session.segments.length - 1}
-                      className="px-2 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded"
-                    >
-                      →
-                    </button>
-                  </div>
+                {/* Tree Visualizer - mini tree preview */}
+                {session.tree.nodes.size > 0 && (
+                  <TreeVisualizer
+                    tree={session.tree}
+                    onExpandClick={() => setShowTreeExplorer(true)}
+                    className="absolute top-4 right-4 z-50"
+                  />
                 )}
 
                 {/* Video Player Container */}
@@ -272,7 +270,21 @@ export const App: React.FC = () => {
                   onRequestNext={requestNextSegment}
                   onNewTopic={requestNewTopic}
                   onReset={handleReset}
+                  onCreateBranch={createBranch}
+                  currentNodeNumber={currentNodeNumber}
                 />
+                
+                {/* Tree Explorer Modal */}
+                {showTreeExplorer && (
+                  <TreeExplorer
+                    tree={session.tree}
+                    onNodeClick={(nodeId) => {
+                      navigateToNode(nodeId);
+                      setShowTreeExplorer(false);
+                    }}
+                    onClose={() => setShowTreeExplorer(false)}
+                  />
+                )}
               </>
             );
           }}

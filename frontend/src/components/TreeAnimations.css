@@ -1,0 +1,146 @@
+/**
+ * TreeAnimations.css
+ * 
+ * Custom animations for tree visualization components
+ */
+
+/* Pulse animation for current node */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.9), 0 0 60px rgba(59, 130, 246, 0.5);
+  }
+}
+
+.pulse-node {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Fade in animation for tree nodes */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-node {
+  animation: fade-in-up 0.3s ease-out;
+}
+
+/* Scale animation for node selection */
+@keyframes scale-bounce {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.bounce-node {
+  animation: scale-bounce 0.3s ease-out;
+}
+
+/* Shimmer effect for edges */
+@keyframes shimmer {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 20;
+  }
+}
+
+.shimmer-edge {
+  stroke-dasharray: 10 10;
+  animation: shimmer 1s linear infinite;
+}
+
+/* Glow animation for tree visualizer */
+@keyframes glow-border {
+  0%, 100% {
+    border-color: rgba(100, 116, 139, 0.5);
+  }
+  50% {
+    border-color: rgba(59, 130, 246, 0.8);
+  }
+}
+
+.glow-border:hover {
+  animation: glow-border 2s ease-in-out infinite;
+}
+
+/* Modal fade in */
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-fade {
+  animation: modal-fade-in 0.2s ease-out;
+}
+
+/* Slide up animation for buttons */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Ripple effect on click */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+}
+
+.ripple-effect:active::after {
+  animation: ripple 0.6s ease-out;
+}
+

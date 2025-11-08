@@ -12,12 +12,19 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   VideoSession,
   VideoSegment,
-  LearningContext,
   createVideoSession,
   updateContext,
 } from '../types/VideoConfig';
 import {
-  generateVideoSegment,
+  getCurrentNode,
+  initializeTree,
+  addChildNode,
+  navigateToNode as navigateToNodeHelper,
+  saveLearningTree,
+  getChildren,
+  getNodeNumber,
+} from '../types/TreeState';
+import {
   evaluateAnswer,
 } from '../services/llmService';
 import { generateVideoScenes, GenerationProgress } from '../services/videoRenderService';
@@ -31,6 +38,9 @@ export interface VideoControllerState {
   
   // Currently playing segment
   currentSegment: VideoSegment | null;
+  
+  // Current node number (e.g., "1.2.1")
+  currentNodeNumber: string;
   
   // Loading states
   isGenerating: boolean;
@@ -46,6 +56,10 @@ export interface VideoControllerState {
   handleAnswer: (answer: string) => Promise<void>;
   requestNextSegment: () => Promise<void>;
   requestNewTopic: (topic: string) => Promise<void>;
+  navigateToNode: (nodeId: string) => void;
+  createBranch: (branchLabel?: string) => void;
+  
+  // Legacy - kept for backward compatibility
   goToSegment: (index: number) => void;
 }
 
@@ -58,39 +72,44 @@ interface VideoControllerProps {
 
 // ===== TEST DATA - EASILY REMOVABLE =====
 /**
- * Create hardcoded test session with 2 video segments
+ * Create hardcoded test session with 2 video segments in a tree
  * Uses public test videos from the internet
  */
 function createTestSession(topic: string): VideoSession {
+  // Create first segment
+  const segment1: VideoSegment = {
+    id: 'test_segment_1',
+    manimCode: '',
+    duration: 30,
+    hasQuestion: true,
+    questionText: 'What are the three main types of machine learning mentioned?',
+    topic: topic,
+    difficulty: 'medium',
+    generatedAt: new Date().toISOString(),
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    renderingStatus: 'completed',
+  };
+  
+  // Initialize tree with root
+  const tree = initializeTree(segment1);
+  
+  // Add second segment as child
+  const segment2: VideoSegment = {
+    id: 'test_segment_2',
+    manimCode: '',
+    duration: 30,
+    hasQuestion: false,
+    topic: topic,
+    difficulty: 'medium',
+    generatedAt: new Date().toISOString(),
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    renderingStatus: 'completed',
+  };
+  
+  addChildNode(tree, tree.rootId, segment2);
+  
   return {
-    segments: [
-      {
-        id: 'test_segment_1',
-        manimCode: '',
-        duration: 30,
-        hasQuestion: true,
-        questionText: 'What are the three main types of machine learning mentioned?',
-        topic: topic,
-        difficulty: 'medium',
-        generatedAt: new Date().toISOString(),
-        // Big Buck Bunny - a popular open-source test video
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-        renderingStatus: 'completed',
-      },
-      {
-        id: 'test_segment_2',
-        manimCode: '',
-        duration: 30,
-        hasQuestion: false,
-        topic: topic,
-        difficulty: 'medium',
-        generatedAt: new Date().toISOString(),
-        // Elephant's Dream - another open-source test video
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-        renderingStatus: 'completed',
-      },
-    ],
-    currentIndex: 0,
+    tree,
     context: {
       initialTopic: topic,
       historyTopics: [topic],
@@ -133,8 +152,10 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   // Generation progress
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | undefined>();
   
-  // Get current segment
-  const currentSegment = session.segments[session.currentIndex] || null;
+  // Get current segment from tree
+  const currentNode = getCurrentNode(session.tree);
+  const currentSegment = currentNode?.segment || null;
+  const currentNodeNumber = currentNode ? getNodeNumber(session.tree, currentNode.id) : '';
   
   /**
    * Generate the first segment when component mounts
@@ -148,7 +169,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     }
     // ===== END TEST MODE =====
     
-    if (session.segments.length === 0 && !isGenerating) {
+    // Check if tree is empty (no root node)
+    if (session.tree.nodes.size === 0 && !isGenerating) {
       console.log('Generating initial segment for topic:', session.context.initialTopic);
       generateInitialSegment();
     }
@@ -173,17 +195,16 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       });
       
       if (result.success && result.sections && result.sections.length > 0) {
-        // Map section URLs to VideoSegments
+        // Create segments
         const segments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
-          // Extract section number from URL (e.g., section_1.mp4 -> 1)
           const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
           const sectionNum = sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1;
           
           return {
             id: `segment_${sectionNum}`,
-            manimCode: '', // Not needed since video is already rendered
-            duration: 90, // Default duration (could be improved with metadata)
-            hasQuestion: index < result.sections!.length - 1, // All but last have questions
+            manimCode: '',
+            duration: 90,
+            hasQuestion: index < result.sections!.length - 1,
             questionText: index < result.sections!.length - 1 
               ? 'What did you learn from this section?' 
               : undefined,
@@ -191,18 +212,29 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             difficulty: 'medium',
             generatedAt: new Date().toISOString(),
             videoUrl: sectionUrl,
-            renderingStatus: 'completed', // Already rendered
+            renderingStatus: 'completed',
           };
         });
         
+        // Build tree structure: first segment is root, rest are linear children
+        const tree = initializeTree(segments[0]);
+        let currentNodeId = tree.rootId;
+        
+        for (let i = 1; i < segments.length; i++) {
+          const newNode = addChildNode(tree, currentNodeId, segments[i]);
+          currentNodeId = newNode.id;
+        }
+        
         setSession((prev) => ({
           ...prev,
-          segments,
-          currentIndex: 0,
+          tree,
           lastUpdatedAt: new Date().toISOString(),
         }));
         
-        console.log(`Generated ${segments.length} video segments`);
+        // Save to localStorage
+        saveLearningTree(session.sessionId, tree);
+        
+        console.log(`Generated tree with ${segments.length} video segments`);
       } else {
         const errorMsg = result.error || 'Failed to generate video scenes';
         setError(errorMsg);
@@ -220,11 +252,11 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   
   /**
    * Handle user's answer to a question
-   * Since all scenes are generated upfront, this evaluates the answer and navigates to next segment
+   * Evaluates the answer and navigates to next node in tree
    */
   const handleAnswer = useCallback(
     async (answer: string) => {
-      if (!currentSegment || !currentSegment.hasQuestion) {
+      if (!currentSegment || !currentSegment.hasQuestion || !currentNode) {
         console.warn('No question to answer in current segment');
         return;
       }
@@ -274,15 +306,14 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         
         setIsEvaluating(false);
         
-        // Navigate to next segment (all scenes already generated)
-        if (session.currentIndex < session.segments.length - 1) {
-          setSession((prev) => ({
-            ...prev,
-            currentIndex: prev.currentIndex + 1,
-            lastUpdatedAt: new Date().toISOString(),
-          }));
+        // Navigate to first child if it exists
+        const children = getChildren(session.tree, currentNode.id);
+        if (children.length > 0) {
+          navigateToNodeHelper(session.tree, children[0].id);
+          setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
+          saveLearningTree(session.sessionId, session.tree);
         } else {
-          console.log('Reached end of available segments after answering');
+          console.log('Reached leaf node after answering');
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -291,35 +322,41 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         setIsEvaluating(false);
       }
     },
-    [currentSegment, session, onError]
+    [currentSegment, currentNode, session, onError]
   );
   
   /**
    * Request next segment without answering a question
-   * (for segments that don't have questions)
-   * Since all scenes are generated upfront, this just navigates to the next segment
+   * Navigates to first child if available
    */
   const requestNextSegment = useCallback(async () => {
-    // If there's a next segment available, navigate to it
-    if (session.currentIndex < session.segments.length - 1) {
-      setSession((prev) => ({
-        ...prev,
-        currentIndex: prev.currentIndex + 1,
-        lastUpdatedAt: new Date().toISOString(),
-      }));
-    } else {
-      // At the end of segments - could generate more or show completion message
-      console.log('Reached end of available segments');
-      // For now, just log - could trigger new generation if needed
+    if (!currentNode) {
+      console.warn('No current node');
+      return;
     }
-  }, [session]);
+    
+    // Navigate to first child if it exists
+    const children = getChildren(session.tree, currentNode.id);
+    if (children.length > 0) {
+      navigateToNodeHelper(session.tree, children[0].id);
+      setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
+      saveLearningTree(session.sessionId, session.tree);
+    } else {
+      console.log('Reached leaf node - no more segments');
+    }
+  }, [currentNode, session]);
   
   /**
    * Request a completely new topic (pivot)
-   * Generates all scenes for the new topic using Modal backend
+   * Generates all scenes for the new topic and adds as branch from current node
    */
   const requestNewTopic = useCallback(
     async (newTopic: string) => {
+      if (!currentNode) {
+        console.warn('No current node to branch from');
+        return;
+      }
+      
       setIsGenerating(true);
       setError(null);
       setGenerationProgress(undefined);
@@ -328,7 +365,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         // Create fresh context for new topic
         const newContext = updateContext(session.context, {
           previousTopic: newTopic,
-          depth: 0, // Reset depth for new topic
+          depth: 0,
           historyTopics: [...session.context.historyTopics, newTopic],
         });
         
@@ -338,7 +375,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         });
         
         if (result.success && result.sections && result.sections.length > 0) {
-          // Map section URLs to VideoSegments
+          // Create segments
           const newSegments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
             const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
             const sectionNum = sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1;
@@ -359,16 +396,34 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             };
           });
           
-          // Append new segments to existing ones
+          // Add new segments as branch from current node
+          const firstNewNode = addChildNode(
+            session.tree,
+            currentNode.id,
+            newSegments[0],
+            `Topic: ${newTopic}`
+          );
+          
+          // Add remaining segments as linear children
+          let currentBranchNodeId = firstNewNode.id;
+          for (let i = 1; i < newSegments.length; i++) {
+            const newNode = addChildNode(session.tree, currentBranchNodeId, newSegments[i]);
+            currentBranchNodeId = newNode.id;
+          }
+          
+          // Navigate to first new node
+          navigateToNodeHelper(session.tree, firstNewNode.id);
+          
           setSession((prev) => ({
             ...prev,
-            segments: [...prev.segments, ...newSegments],
-            currentIndex: prev.segments.length, // Navigate to first new segment
             context: newContext,
             lastUpdatedAt: new Date().toISOString(),
           }));
           
-          console.log(`Generated ${newSegments.length} video segments for new topic: ${newTopic}`);
+          // Save to localStorage
+          saveLearningTree(session.sessionId, session.tree);
+          
+          console.log(`Generated branch with ${newSegments.length} video segments for new topic: ${newTopic}`);
         } else {
           const errorMsg = result.error || 'Failed to generate video scenes for new topic';
           setError(errorMsg);
@@ -383,26 +438,77 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         setGenerationProgress(undefined);
       }
     },
-    [session, onError]
+    [currentNode, session, onError]
   );
   
   /**
-   * Navigate to a specific segment in history
+   * Navigate to a specific node by ID
    */
-  const goToSegment = useCallback((index: number) => {
-    if (index >= 0 && index < session.segments.length) {
-      setSession((prev) => ({
-        ...prev,
-        currentIndex: index,
-        lastUpdatedAt: new Date().toISOString(),
-      }));
+  const navigateToNode = useCallback((nodeId: string) => {
+    try {
+      navigateToNodeHelper(session.tree, nodeId);
+      setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
+      saveLearningTree(session.sessionId, session.tree);
+    } catch (err) {
+      console.error('Failed to navigate to node:', err);
     }
-  }, [session.segments.length]);
+  }, [session]);
+  
+  /**
+   * Create a branch from current node (placeholder for future question feature)
+   */
+  const createBranch = useCallback((branchLabel?: string) => {
+    if (!currentNode) {
+      console.warn('No current node to branch from');
+      return;
+    }
+    
+    // Create a dummy segment for testing
+    const dummySegment: VideoSegment = {
+      id: `branch_${Date.now()}`,
+      manimCode: '',
+      duration: 30,
+      hasQuestion: false,
+      questionText: undefined,
+      topic: `Branch from ${currentSegment?.topic || 'unknown'}`,
+      difficulty: 'medium',
+      generatedAt: new Date().toISOString(),
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      renderingStatus: 'completed',
+    };
+    
+    // Add as child node
+    const newNode = addChildNode(
+      session.tree,
+      currentNode.id,
+      dummySegment,
+      branchLabel || 'New Branch'
+    );
+    
+    // Navigate to the new branch
+    navigateToNodeHelper(session.tree, newNode.id);
+    
+    setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
+    saveLearningTree(session.sessionId, session.tree);
+    
+    console.log('Created new branch:', branchLabel || 'New Branch');
+  }, [currentNode, currentSegment, session]);
+  
+  /**
+   * Navigate to a specific segment by index (legacy compatibility)
+   * @deprecated Use navigateToNode instead
+   */
+  const goToSegment = useCallback((_index: number) => {
+    console.warn('goToSegment is deprecated, but attempting to navigate...');
+    // This is a best-effort compatibility function
+    // It doesn't work the same way with tree structure
+  }, []);
   
   // Build state object for children
   const state: VideoControllerState = {
     session,
     currentSegment,
+    currentNodeNumber,
     isGenerating,
     isEvaluating,
     error,
@@ -410,6 +516,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     handleAnswer,
     requestNextSegment,
     requestNewTopic,
+    navigateToNode,
+    createBranch,
     goToSegment,
   };
   
