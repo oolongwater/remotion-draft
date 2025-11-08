@@ -5,6 +5,8 @@
  * Replaces the old rigid scene-based structure with flexible video segments.
  */
 
+import { AnimationSequence } from './AnimationInstruction';
+
 /**
  * Color configuration for video segments
  */
@@ -21,7 +23,8 @@ export interface ColorConfig {
  */
 export interface VideoSegment {
   id: string;
-  componentCode: string; // JSX/TSX code to render
+  animationSequence?: AnimationSequence; // New: Visual animation sequence
+  componentCode?: string; // Legacy: JSX/TSX code to render (deprecated)
   duration: number; // Duration in frames
   hasQuestion: boolean; // Whether this segment ends with a question
   questionText?: string; // The question text if hasQuestion is true

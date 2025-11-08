@@ -15,11 +15,17 @@ import { LandingPage } from "./components/LandingPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorDisplay } from "./components/ErrorDisplay";
 import { DynamicSceneRenderer } from "./remotion/DynamicSceneRenderer";
+import { ContinuousCanvas } from "./remotion/ContinuousCanvas";
+import { EvolutionController } from "./controllers/EvolutionController";
+import { EvolvingComposition } from "./remotion/EvolvingComposition";
+import { QuestionPauseController } from "./controllers/QuestionPauseController";
+import { useCurrentPlayerFrame } from "./utils/useCurrentPlayerFrame";
+import { EvolvingVideoDisplay } from "./components/EvolvingVideoDisplay";
 
 /**
  * App state types
  */
-type AppState = 'landing' | 'learning' | 'error';
+type AppState = 'landing' | 'learning' | 'evolving' | 'error';
 
 /**
  * Main App Component
@@ -41,7 +47,7 @@ export const App: React.FC = () => {
    */
   const handleTopicSubmit = async (topic: string) => {
     setCurrentTopic(topic);
-    setAppState('learning');
+    setAppState('evolving'); // Use evolving composition system
     setError('');
   };
   
@@ -83,7 +89,69 @@ export const App: React.FC = () => {
     return <ErrorDisplay error={error} onRetry={handleRetry} />;
   }
   
-  // Learning state - show video flow
+  // Evolving state - show continuously evolving composition
+  if (appState === 'evolving' && currentTopic) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center bg-slate-900">
+        <EvolutionController
+          topic={currentTopic}
+          onError={handleVideoError}
+        >
+          {({ scripts, currentScript, isGenerating, isExtending, totalDuration, error: evolutionError, extendEvolution }) => {
+            // Show loading spinner while generating first script
+            if (!currentScript && isGenerating) {
+              return (
+                <div className="flex items-center justify-center w-full h-screen">
+                  <LoadingSpinner />
+                </div>
+              );
+            }
+            
+            // Show error if something went wrong
+            if (evolutionError) {
+              return (
+                <div className="flex items-center justify-center w-full h-screen">
+                  <ErrorDisplay error={evolutionError} onRetry={handleRetry} />
+                </div>
+              );
+            }
+            
+            // No script yet - show waiting state
+            if (!currentScript) {
+              return (
+                <div className="flex items-center justify-center w-full h-screen">
+                  <div className="text-white text-center">
+                    <div className="text-2xl mb-4">Preparing your evolving visual experience...</div>
+                    <LoadingSpinner />
+                  </div>
+                </div>
+              );
+            }
+            
+            return (
+              <EvolvingVideoDisplay
+                scripts={scripts}
+                topic={currentTopic}
+                totalDuration={totalDuration}
+                isExtending={isExtending}
+                onReset={handleReset}
+                onAnswerEvaluated={(correct, reasoning) => {
+                  console.log('Answer evaluated:', correct, reasoning);
+                  extendEvolution(reasoning, correct);
+                }}
+                onAutoExtend={() => {
+                  console.log('Auto-extending composition');
+                  extendEvolution();
+                }}
+              />
+            );
+          }}
+        </EvolutionController>
+      </div>
+    );
+  }
+  
+  // Learning state - show video flow (legacy system)
   if (appState === 'learning' && currentTopic) {
     return (
       <div className="relative w-full h-full flex items-center justify-center bg-slate-900">
@@ -207,31 +275,55 @@ export const App: React.FC = () => {
 
                 {/* Remotion Player Container */}
                 <div className="relative shadow-2xl rounded-lg overflow-hidden bg-black" style={{ width: "90vw", maxWidth: "1280px" }}>
-                  <Player
-                    key={segmentKey}
-                    ref={playerRef}
-                    component={DynamicSceneRenderer}
-                    inputProps={{
-                      config: {
-                        type: 'dynamic' as const,
-                        id: currentSegment.id,
-                        duration: currentSegment.duration,
-                        componentCode: currentSegment.componentCode,
-                        colors: currentSegment.colors,
-                      },
-                    }}
-                    durationInFrames={currentSegment.duration}
-                    compositionWidth={session.width}
-                    compositionHeight={session.height}
-                    fps={session.fps}
-                    controls={false}
-                    loop={currentSegment.hasQuestion} // Loop if there's a question, otherwise play once
-                    style={{
-                      width: "100%",
-                    }}
-                    clickToPlay={false}
-                    autoPlay
-                  />
+                  {currentSegment.animationSequence ? (
+                    // New visual animation system
+                    <Player
+                      key={segmentKey}
+                      ref={playerRef}
+                      component={ContinuousCanvas}
+                      inputProps={{
+                        sequence: currentSegment.animationSequence,
+                      }}
+                      durationInFrames={currentSegment.duration}
+                      compositionWidth={session.width}
+                      compositionHeight={session.height}
+                      fps={session.fps}
+                      controls={false}
+                      loop={currentSegment.hasQuestion}
+                      style={{
+                        width: "100%",
+                      }}
+                      clickToPlay={false}
+                      autoPlay
+                    />
+                  ) : (
+                    // Legacy component code system (fallback)
+                    <Player
+                      key={segmentKey}
+                      ref={playerRef}
+                      component={DynamicSceneRenderer}
+                      inputProps={{
+                        config: {
+                          type: 'dynamic' as const,
+                          id: currentSegment.id,
+                          duration: currentSegment.duration,
+                          componentCode: currentSegment.componentCode || '',
+                          colors: currentSegment.colors,
+                        },
+                      }}
+                      durationInFrames={currentSegment.duration}
+                      compositionWidth={session.width}
+                      compositionHeight={session.height}
+                      fps={session.fps}
+                      controls={false}
+                      loop={currentSegment.hasQuestion}
+                      style={{
+                        width: "100%",
+                      }}
+                      clickToPlay={false}
+                      autoPlay
+                    />
+                  )}
                 </div>
 
                 {/* Input Overlay - shown when segment has a question or when loading next */}
