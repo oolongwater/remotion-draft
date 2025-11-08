@@ -33,6 +33,9 @@ export const App: React.FC = () => {
   
   // Track when segment changes to restart playback
   const [segmentKey, setSegmentKey] = useState(0);
+  
+  // Track when video has ended
+  const [videoEnded, setVideoEnded] = useState(false);
 
   /**
    * Handle topic submission from landing page
@@ -114,26 +117,22 @@ export const App: React.FC = () => {
             useEffect(() => {
               if (currentSegment && currentSegment.videoUrl && videoRef.current) {
                 setSegmentKey((prev) => prev + 1);
+                setVideoEnded(false); // Reset video ended state
                 videoRef.current.load();
                 videoRef.current.play().catch(console.error);
               }
             }, [currentSegment?.id, currentSegment?.videoUrl]);
             
-            // Check if video has ended and should auto-advance
-            useEffect(() => {
-              if (!videoRef.current) return;
-              
-              const handleVideoEnd = () => {
-                if (currentSegment && !currentSegment.hasQuestion && !isGenerating) {
-                  requestNextSegment();
-                }
-              };
-              
-              videoRef.current.addEventListener('ended', handleVideoEnd);
-              return () => {
-                videoRef.current?.removeEventListener('ended', handleVideoEnd);
-              };
-            }, [currentSegment, isGenerating, requestNextSegment]);
+            // Handler for when video ends
+            const handleVideoEnd = () => {
+              console.log('🎬 VIDEO ENDED! Has question:', currentSegment?.hasQuestion);
+              setVideoEnded(true);
+              console.log('Set videoEnded to true');
+              if (currentSegment && !currentSegment.hasQuestion && !isGenerating) {
+                console.log('No question, auto-advancing to next segment');
+                requestNextSegment();
+              }
+            };
             
             // NOW we can do conditional returns
             
@@ -212,7 +211,7 @@ export const App: React.FC = () => {
                       src={currentSegment.videoUrl}
                       controls
                       autoPlay
-                      loop={currentSegment.hasQuestion}
+                      onEnded={handleVideoEnd}
                       className="w-full h-auto"
                       style={{
                         maxHeight: "80vh",
@@ -236,19 +235,41 @@ export const App: React.FC = () => {
                       </div>
                     </div>
                   )}
-                </div>
 
-                {/* Input Overlay - shown when segment has a question or when loading next */}
-                <InputOverlay
-                  hasQuestion={currentSegment.hasQuestion}
-                  questionText={currentSegment.questionText}
-                  isGenerating={isGenerating}
-                  isEvaluating={isEvaluating}
-                  onAnswer={handleAnswer}
-                  onRequestNext={requestNextSegment}
-                  onNewTopic={requestNewTopic}
-                  onReset={handleReset}
-                />
+                  {/* Question Overlay - shown over video when it ends and has a question */}
+                  {(() => {
+                    console.log('InputOverlay props:', {
+                      hasQuestion: currentSegment.hasQuestion,
+                      videoEnded,
+                      questionText: currentSegment.questionText,
+                      questionOptions: currentSegment.questionOptions,
+                    });
+                    return null;
+                  })()}
+                  <InputOverlay
+                    hasQuestion={currentSegment.hasQuestion}
+                    videoEnded={videoEnded}
+                    questionText={currentSegment.questionText}
+                    questionOptions={currentSegment.questionOptions}
+                    correctAnswer={currentSegment.correctAnswer}
+                    isGenerating={isGenerating}
+                    isEvaluating={isEvaluating}
+                    isLastSegment={session.currentIndex === session.segments.length - 1}
+                    onAnswer={async (answer) => {
+                      console.log('Answer submitted:', answer);
+                      const result = await handleAnswer(answer);
+                      setVideoEnded(false); // Reset when answering to allow replay
+                      return result;
+                    }}
+                    onRequestNext={requestNextSegment}
+                    onNewTopic={requestNewTopic}
+                    onReset={handleReset}
+                    onRepeat={() => {
+                      setVideoEnded(false);
+                      goToSegment(0); // Go back to first segment
+                    }}
+                  />
+                </div>
               </>
             );
           }}

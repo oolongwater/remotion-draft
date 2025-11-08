@@ -502,6 +502,141 @@ export async function generateVideoConfig(topic: string): Promise<any> {
 }
 
 /**
+ * Generate a multiple choice question for a video section based on its actual content
+ */
+export async function generateSectionQuestion(
+  topic: string,
+  sectionNumber: number,
+  totalSections: number,
+  sectionContent?: {
+    title: string;
+    description: string;
+  }
+): Promise<{ 
+  success: boolean; 
+  question?: string; 
+  options?: string[];
+  correctAnswer?: string;
+  error?: string;
+}> {
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+  
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'API key not configured',
+    };
+  }
+  
+  try {
+    // Build context about the section
+    const contentContext = sectionContent 
+      ? `Section Title: "${sectionContent.title}"
+Section Content: ${sectionContent.description}`
+      : `Section ${sectionNumber} of ${totalSections}`;
+
+    const prompt = `Generate a simple multiple choice comprehension question for a video section about "${topic}".
+
+${contentContext}
+
+Guidelines:
+- Base the question SPECIFICALLY on the key concept from the content above
+- Keep the question simple and straightforward
+- Focus on one main concept or fact that was taught
+- Make it easy to understand but meaningful
+- Don't reference "this section" or "the video" - make it standalone
+- Provide 4 answer options (A, B, C, D)
+- Make the incorrect options plausible but clearly wrong if you understood the content
+- Only ONE option should be correct
+
+${sectionNumber === 1 ? '- This is the introduction, so ask about foundational concepts' : ''}
+${sectionNumber === totalSections ? '- This is the final section, so ask about key takeaways or applications' : ''}
+${sectionNumber > 1 && sectionNumber < totalSections ? '- This is a middle section, so ask about the core concept explained' : ''}
+
+Return response in JSON format:
+{
+  "question": "The question text",
+  "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+  "correctAnswer": "Option A text"
+}
+
+Return ONLY valid JSON, no markdown code blocks.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 400,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    });
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `API request failed: ${response.status}`,
+      };
+    }
+    
+    const data = await response.json();
+    const textContent = data.content?.[0]?.text?.trim();
+    
+    if (!textContent) {
+      return {
+        success: false,
+        error: 'No question generated',
+      };
+    }
+    
+    // Parse JSON response
+    const cleanedJSON = cleanJSONResponse(textContent);
+    let questionData: any;
+    
+    try {
+      questionData = JSON.parse(cleanedJSON);
+    } catch (parseError) {
+      console.error('Failed to parse question JSON:', parseError);
+      return {
+        success: false,
+        error: 'Failed to parse question response',
+      };
+    }
+    
+    // Validate the structure
+    if (!questionData.question || !Array.isArray(questionData.options) || questionData.options.length !== 4 || !questionData.correctAnswer) {
+      return {
+        success: false,
+        error: 'Invalid question structure',
+      };
+    }
+    
+    return {
+      success: true,
+      question: questionData.question,
+      options: questionData.options,
+      correctAnswer: questionData.correctAnswer,
+    };
+  } catch (error) {
+    console.error('Question generation error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
  * Save configuration to localStorage
  */
 export function saveConfigToLocalStorage(config: any): void {

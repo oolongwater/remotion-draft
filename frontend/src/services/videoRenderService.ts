@@ -8,6 +8,25 @@
 import { VideoSegment } from "../types/VideoConfig";
 
 /**
+ * Video section information from the plan
+ */
+export interface VideoSectionInfo {
+  section: string;
+  duration: string;
+  content: string;
+}
+
+/**
+ * Mega plan structure from the backend
+ */
+export interface MegaPlan {
+  description?: string;
+  learning_goals?: string[];
+  visual_approach?: string;
+  video_structure?: VideoSectionInfo[];
+}
+
+/**
  * Progress update from the backend
  */
 export interface GenerationProgress {
@@ -18,6 +37,7 @@ export interface GenerationProgress {
   message?: string;
   job_id?: string;
   sections?: string[]; // List of section video URLs (only in completion)
+  plan?: MegaPlan; // Mega plan with section details
   error?: string;
   metadata?: {
     prompt?: string;
@@ -35,6 +55,7 @@ export async function generateVideoScenes(
 ): Promise<{
   success: boolean;
   sections?: string[];
+  plan?: MegaPlan;
   error?: string;
   jobId?: string;
 }> {
@@ -75,6 +96,7 @@ export async function generateVideoScenes(
 
     let buffer = "";
     let finalSections: string[] | undefined;
+    let megaPlan: MegaPlan | undefined;
     let jobId: string | undefined;
     let finalStatus: "processing" | "completed" | "failed" = "processing";
     let finalError: string | undefined;
@@ -100,6 +122,11 @@ export async function generateVideoScenes(
             // Update progress
             if (data.job_id) {
               jobId = data.job_id;
+            }
+
+            // Capture the mega plan when it's sent
+            if (data.plan) {
+              megaPlan = data.plan;
             }
 
             if (data.status === "completed" && data.sections) {
@@ -140,6 +167,7 @@ export async function generateVideoScenes(
       return {
         success: true,
         sections: finalSections,
+        plan: megaPlan,
         jobId,
       };
     } else if (finalStatus === "failed") {

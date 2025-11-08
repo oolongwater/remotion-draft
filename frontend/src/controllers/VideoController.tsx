@@ -12,15 +12,14 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   VideoSession,
   VideoSegment,
-  LearningContext,
   createVideoSession,
   updateContext,
 } from '../types/VideoConfig';
 import {
-  generateVideoSegment,
-  evaluateAnswer,
+  generateSectionQuestion,
 } from '../services/llmService';
 import { generateVideoScenes, GenerationProgress } from '../services/videoRenderService';
+import { TEST_SEGMENTS } from '../services/testData';
 
 /**
  * Props for VideoController render function
@@ -43,7 +42,7 @@ export interface VideoControllerState {
   generationProgress?: GenerationProgress;
   
   // Actions
-  handleAnswer: (answer: string) => Promise<void>;
+  handleAnswer: (answer: string) => Promise<{ correct: boolean; correctAnswer?: string } | undefined>;
   requestNextSegment: () => Promise<void>;
   requestNewTopic: (topic: string) => Promise<void>;
   goToSegment: (index: number) => void;
@@ -105,6 +104,25 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     try {
       const topic = session.context.initialTopic || 'a topic';
       
+      // Check if this is test mode
+      const isTestMode = topic.toLowerCase().includes('__test__');
+      
+      if (isTestMode) {
+        // Use pre-loaded test data instead of calling backend
+        console.log('🧪 TEST MODE: Using pre-loaded test data');
+        
+        setSession((prev) => ({
+          ...prev,
+          segments: TEST_SEGMENTS,
+          currentIndex: 0,
+          lastUpdatedAt: new Date().toISOString(),
+        }));
+        
+        console.log(`Loaded ${TEST_SEGMENTS.length} test segments instantly`);
+        setIsGenerating(false);
+        return;
+      }
+      
       const result = await generateVideoScenes(topic, (progress) => {
         // Update progress state for UI
         setGenerationProgress(progress);
@@ -112,7 +130,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       });
       
       if (result.success && result.sections && result.sections.length > 0) {
-        // Map section URLs to VideoSegments
+        // Map section URLs to VideoSegments with placeholder questions initially
         const segments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
           // Extract section number from URL (e.g., section_1.mp4 -> 1)
           const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
@@ -122,10 +140,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             id: `segment_${sectionNum}`,
             manimCode: '', // Not needed since video is already rendered
             duration: 90, // Default duration (could be improved with metadata)
-            hasQuestion: index < result.sections!.length - 1, // All but last have questions
-            questionText: index < result.sections!.length - 1 
-              ? 'What did you learn from this section?' 
-              : undefined,
+            hasQuestion: true, // All segments have questions now
+            questionText: 'Loading question...', 
             topic: topic,
             difficulty: 'medium',
             generatedAt: new Date().toISOString(),
@@ -142,6 +158,81 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         }));
         
         console.log(`Generated ${segments.length} video segments`);
+        
+        // Generate dynamic questions for each section based on content
+        if (result.plan?.video_structure) {
+          console.log('Generating dynamic questions based on section content...');
+          
+          // Generate questions in parallel for all sections (including the last one)
+          const questionPromises = result.sections.map(async (_sectionUrl, index) => {
+            const sectionInfo = result.plan!.video_structure![index];
+            const sectionNum = index + 1;
+            
+            try {
+              const questionResult = await generateSectionQuestion(
+                topic,
+                sectionNum,
+                result.sections!.length,
+                {
+                  title: sectionInfo.section,
+                  description: sectionInfo.content,
+                }
+              );
+              
+              if (questionResult.success && questionResult.question && questionResult.options && questionResult.correctAnswer) {
+                console.log(`Generated question for section ${sectionNum}: ${questionResult.question}`);
+                return {
+                  index,
+                  question: questionResult.question,
+                  options: questionResult.options,
+                  correctAnswer: questionResult.correctAnswer,
+                };
+              } else {
+                console.warn(`Failed to generate question for section ${sectionNum}:`, questionResult.error);
+                return {
+                  index,
+                  question: 'What did you learn from this section?',
+                  options: ['I learned a lot', 'I learned something', 'I need to review', 'I am confused'],
+                  correctAnswer: 'I learned a lot', // Fallback
+                };
+              }
+            } catch (error) {
+              console.error(`Error generating question for section ${sectionNum}:`, error);
+              return {
+                index,
+                question: 'What did you learn from this section?',
+                options: ['I learned a lot', 'I learned something', 'I need to review', 'I am confused'],
+                correctAnswer: 'I learned a lot', // Fallback
+              };
+            }
+          });
+          
+          // Wait for all questions to be generated
+          const questions = await Promise.all(questionPromises);
+          
+          // Update segments with generated questions
+          setSession((prev) => {
+            const updatedSegments = [...prev.segments];
+            questions.forEach((q) => {
+              if (q && updatedSegments[q.index]) {
+                updatedSegments[q.index] = {
+                  ...updatedSegments[q.index],
+                  questionText: q.question,
+                  questionOptions: q.options,
+                  correctAnswer: q.correctAnswer,
+                };
+              }
+            });
+            
+            return {
+              ...prev,
+              segments: updatedSegments,
+              lastUpdatedAt: new Date().toISOString(),
+            };
+          });
+          
+          console.log('All questions generated and updated');
+        }
       } else {
         const errorMsg = result.error || 'Failed to generate video scenes';
         setError(errorMsg);
@@ -158,8 +249,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   };
   
   /**
-   * Handle user's answer to a question
-   * Since all scenes are generated upfront, this evaluates the answer and navigates to next segment
+   * Handle user's answer to a multiple choice question
+   * Checks the answer locally and returns the result
    */
   const handleAnswer = useCallback(
     async (answer: string) => {
@@ -172,27 +263,15 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       setError(null);
       
       try {
-        // Evaluate the answer
-        const evalResponse = await evaluateAnswer(
-          answer,
-          currentSegment.questionText || '',
-          currentSegment.topic
-        );
+        // Check if answer is correct (local check, no API call)
+        const correct = answer === currentSegment.correctAnswer;
         
-        if (!evalResponse.success) {
-          const errorMsg = evalResponse.error || 'Failed to evaluate answer';
-          setError(errorMsg);
-          onError?.(errorMsg);
-          setIsEvaluating(false);
-          return;
-        }
-        
-        const { correct } = evalResponse;
+        console.log(`Answer "${answer}" is ${correct ? 'correct' : 'incorrect'}. Correct answer was: "${currentSegment.correctAnswer}"`);
         
         // Update correctness pattern
         const newPattern = [
           ...(session.context.correctnessPattern || []),
-          correct || false,
+          correct,
         ].slice(-5); // Keep last 5 answers
         
         // Update context
@@ -213,21 +292,14 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         
         setIsEvaluating(false);
         
-        // Navigate to next segment (all scenes already generated)
-        if (session.currentIndex < session.segments.length - 1) {
-          setSession((prev) => ({
-            ...prev,
-            currentIndex: prev.currentIndex + 1,
-            lastUpdatedAt: new Date().toISOString(),
-          }));
-        } else {
-          console.log('Reached end of available segments after answering');
-        }
+        // Return the result so the UI can handle it
+        return { correct, correctAnswer: currentSegment.correctAnswer };
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMsg);
         onError?.(errorMsg);
         setIsEvaluating(false);
+        return { correct: false, correctAnswer: currentSegment.correctAnswer };
       }
     },
     [currentSegment, session, onError]
@@ -277,7 +349,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         });
         
         if (result.success && result.sections && result.sections.length > 0) {
-          // Map section URLs to VideoSegments
+          // Map section URLs to VideoSegments with placeholder questions
           const newSegments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
             const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
             const sectionNum = sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1;
@@ -286,10 +358,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
               id: `segment_${Date.now()}_${sectionNum}`,
               manimCode: '',
               duration: 90,
-              hasQuestion: index < result.sections!.length - 1,
-              questionText: index < result.sections!.length - 1 
-                ? 'What did you learn from this section?' 
-                : undefined,
+              hasQuestion: true, // All segments have questions now
+              questionText: 'Loading question...',
               topic: newTopic,
               difficulty: 'medium',
               generatedAt: new Date().toISOString(),
@@ -297,6 +367,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
               renderingStatus: 'completed',
             };
           });
+          
+          const firstNewSegmentIndex = session.segments.length;
           
           // Append new segments to existing ones
           setSession((prev) => ({
@@ -308,6 +380,77 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           }));
           
           console.log(`Generated ${newSegments.length} video segments for new topic: ${newTopic}`);
+          
+          // Generate dynamic questions for the new topic's sections (including the last one)
+          if (result.plan?.video_structure) {
+            console.log('Generating dynamic questions for new topic sections...');
+            
+            const questionPromises = result.sections.map(async (_sectionUrl, index) => {
+              const sectionInfo = result.plan!.video_structure![index];
+              const sectionNum = index + 1;
+              
+              try {
+                const questionResult = await generateSectionQuestion(
+                  newTopic,
+                  sectionNum,
+                  result.sections!.length,
+                  {
+                    title: sectionInfo.section,
+                    description: sectionInfo.content,
+                  }
+                );
+                
+                if (questionResult.success && questionResult.question && questionResult.options && questionResult.correctAnswer) {
+                  console.log(`Generated question for new topic section ${sectionNum}: ${questionResult.question}`);
+                  return {
+                    index: firstNewSegmentIndex + index,
+                    question: questionResult.question,
+                    options: questionResult.options,
+                    correctAnswer: questionResult.correctAnswer,
+                  };
+                } else {
+                  return {
+                    index: firstNewSegmentIndex + index,
+                    question: 'What did you learn from this section?',
+                    options: ['I learned a lot', 'I learned something', 'I need to review', 'I am confused'],
+                    correctAnswer: 'I learned a lot',
+                  };
+                }
+              } catch (error) {
+                console.error(`Error generating question for new topic section ${sectionNum}:`, error);
+                return {
+                  index: firstNewSegmentIndex + index,
+                  question: 'What did you learn from this section?',
+                  options: ['I learned a lot', 'I learned something', 'I need to review', 'I am confused'],
+                  correctAnswer: 'I learned a lot',
+                };
+              }
+            });
+            
+            const questions = await Promise.all(questionPromises);
+            
+            setSession((prev) => {
+              const updatedSegments = [...prev.segments];
+              questions.forEach((q) => {
+                if (q && updatedSegments[q.index]) {
+                  updatedSegments[q.index] = {
+                    ...updatedSegments[q.index],
+                    questionText: q.question,
+                    questionOptions: q.options,
+                    correctAnswer: q.correctAnswer,
+                  };
+                }
+              });
+              
+              return {
+                ...prev,
+                segments: updatedSegments,
+                lastUpdatedAt: new Date().toISOString(),
+              };
+            });
+            
+            console.log('Questions generated for new topic');
+          }
         } else {
           const errorMsg = result.error || 'Failed to generate video scenes for new topic';
           setError(errorMsg);

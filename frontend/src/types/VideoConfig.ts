@@ -14,6 +14,8 @@ export interface VideoSegment {
   duration: number; // Duration in seconds
   hasQuestion: boolean; // Whether this segment ends with a question
   questionText?: string; // The question text if hasQuestion is true
+  questionOptions?: string[]; // Multiple choice options (if hasQuestion is true)
+  correctAnswer?: string; // The correct answer (if hasQuestion is true)
   topic: string; // What topic this segment teaches
   difficulty: 'easy' | 'medium' | 'hard'; // Difficulty level
   // Optional metadata
@@ -160,7 +162,7 @@ export interface SceneConfig {
   duration: number;
   content?: any;
   animations?: any;
-  colors?: ColorConfig;
+  colors?: any;
 }
 
 /**

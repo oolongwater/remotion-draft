@@ -99,6 +99,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit }) => {
               </button>
             ))}
           </div>
+          
+          {/* Test Button */}
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => onSubmit('__TEST__')}
+              className="px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 hover:text-yellow-300 rounded-lg text-sm transition-all duration-200 border border-yellow-600/50 hover:border-yellow-500 backdrop-blur-sm font-semibold"
+            >
+              🧪 Test (instant - 2 segments)
+            </button>
+          </div>
         </div>
         
         {/* Feature Highlights */}
