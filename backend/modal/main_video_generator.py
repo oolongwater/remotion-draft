@@ -55,6 +55,7 @@ image = (
         "fastapi[standard]>=0.104.0",
         "anthropic>=0.40.0",
         "cerebras-cloud-sdk",
+        "optillm",  # For CePO (Cerebras Planning & Optimization)
     )
     .add_local_file("../llm.py", "/root/llm.py")
     .add_local_file("../tts.py", "/root/tts.py")  # TTS service (ElevenLabs)

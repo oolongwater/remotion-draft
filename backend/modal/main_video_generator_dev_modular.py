@@ -74,6 +74,7 @@ image = (
         "fastapi[standard]>=0.104.0",
         "anthropic>=0.40.0",
         "cerebras-cloud-sdk",
+        "optillm",  # For CePO (Cerebras Planning & Optimization)
         "google-cloud-storage>=2.10.0",
     )
     # Add services directory as a Python package

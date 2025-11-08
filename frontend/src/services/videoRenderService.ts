@@ -39,7 +39,7 @@ export async function generateVideoScenes(
   jobId?: string;
 }> {
   const modalEndpoint =
-    "https://evan-zhangmingjun--main-video-generator-dev-generate-video-api.modal.run";
+    "https://video-gen--main-video-generator-dev-generate-video-api.modal.run/";
 
   try {
     console.log("Generating video scenes for topic:", topic);

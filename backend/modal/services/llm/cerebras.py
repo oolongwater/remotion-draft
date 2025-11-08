@@ -224,6 +224,194 @@ class CerebrasService(LLMService):
 
         return response.content
 
+    def generate_with_cepo(self,
+                          prompt: str,
+                          system_prompt: Optional[str] = None,
+                          max_tokens: Optional[int] = None,
+                          temperature: Optional[float] = None,
+                          **kwargs) -> str:
+        """
+        Generate response using CePO (Cerebras Planning & Optimization).
+        
+        CePO enhances reasoning by using test-time compute with:
+        1. Planning: Step-by-step plan generation
+        2. Execution: Multiple response generations
+        3. Analysis: Inconsistency detection
+        4. Best-of-N: Confidence-scored selection
+        
+        Note: CePO currently supports llama-3.3-70b model.
+        Reference: https://inference-docs.cerebras.ai/capabilities/cepo
+        
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system prompt
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional parameters
+            
+        Returns:
+            Generated text response
+        """
+        import json
+        import subprocess
+        
+        # CePO requires llama-3.3-70b model - override to ensure correct model
+        original_model = self.model
+        model = "llama-3.3-70b"
+        if original_model != model:
+            print(f"⚠️  CePO requires llama-3.3-70b, overriding model from {original_model} to {model}")
+        
+        # Check if OptiLLM is available
+        try:
+            import importlib.util
+            optillm_spec = importlib.util.find_spec("optillm")
+            use_programmatic = optillm_spec is not None
+        except Exception:
+            use_programmatic = False
+        
+        if not use_programmatic:
+            print("⚠️  OptiLLM not installed, using subprocess method")
+        
+        if use_programmatic:
+            # Try programmatic API if available
+            try:
+                # OptiLLM programmatic usage (if supported)
+                from optillm import OptiLLM
+                
+                optillm_client = OptiLLM(
+                    base_url="https://api.cerebras.ai",
+                    api_key=self.api_key,
+                    approach="cepo"
+                )
+                
+                # Prepare messages
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                
+                response = optillm_client.generate(
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    **kwargs
+                )
+                
+                return response.content if hasattr(response, 'content') else str(response)
+                
+            except Exception as e:
+                print(f"⚠️  OptiLLM programmatic API failed: {e}")
+                print(f"   Falling back to subprocess method")
+                use_programmatic = False
+        
+        if not use_programmatic:
+            # Use subprocess to call OptiLLM CLI
+            # Prepare input data as JSON
+            input_data = {
+                "messages": [],
+                "model": model  # Override to llama-3.3-70b for CePO
+            }
+            if system_prompt:
+                input_data["messages"].append({"role": "system", "content": system_prompt})
+            input_data["messages"].append({"role": "user", "content": prompt})
+            
+            if max_tokens:
+                input_data["max_tokens"] = max_tokens
+            if temperature is not None:
+                input_data["temperature"] = temperature
+            
+            input_json = json.dumps(input_data)
+            
+            try:
+                # Build OptiLLM command
+                # OptiLLM CLI typically reads from stdin and writes to stdout
+                cmd = [
+                    "optillm",
+                    "--base-url", "https://api.cerebras.ai",
+                    "--approach", "cepo"
+                ]
+                
+                if kwargs.get("cepo_print_output", False):
+                    cmd.extend(["--cepo_print_output", "true"])
+                
+                # Set API key in environment
+                env = os.environ.copy()
+                env["CEREBRAS_API_KEY"] = self.api_key
+                
+                print(f"🤖 Calling CePO via OptiLLM CLI...")
+                print(f"   Model: {model}")
+                print(f"   Approach: cepo")
+                
+                # Run OptiLLM with stdin/stdout
+                result = subprocess.run(
+                    cmd,
+                    input=input_json,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    check=True,
+                    timeout=300  # 5 minute timeout
+                )
+                
+                # Parse output (may be JSON or plain text)
+                try:
+                    output_data = json.loads(result.stdout)
+                    # Extract response content
+                    if "content" in output_data:
+                        content = output_data["content"]
+                    elif "choices" in output_data and output_data["choices"]:
+                        content = output_data["choices"][0].get("message", {}).get("content", "")
+                    elif "text" in output_data:
+                        content = output_data["text"]
+                    else:
+                        content = result.stdout.strip()
+                except json.JSONDecodeError:
+                    # If output is not JSON, use stdout directly
+                    content = result.stdout.strip()
+                
+                if not content:
+                    # Fallback to stderr if stdout is empty
+                    content = result.stderr.strip() if result.stderr else ""
+                
+                print(f"✅ CePO generation completed")
+                return content
+                
+            except subprocess.CalledProcessError as e:
+                print(f"❌ CePO subprocess error: {e}")
+                print(f"   stdout: {e.stdout}")
+                print(f"   stderr: {e.stderr}")
+                raise LLMServiceError(f"CePO generation failed: {e.stderr}")
+            except subprocess.TimeoutExpired:
+                raise LLMServiceError("CePO generation timed out after 5 minutes")
+            except FileNotFoundError:
+                raise LLMServiceError(
+                    "OptiLLM CLI not found. Install with: pip install optillm"
+                )
+
+    async def generate_simple_cepo_async(self,
+                                        prompt: str,
+                                        system_prompt: Optional[str] = None,
+                                        max_tokens: Optional[int] = None,
+                                        temperature: Optional[float] = None,
+                                        **kwargs) -> str:
+        """
+        Async version of generate_with_cepo() for parallel API calls.
+        """
+        import asyncio
+        
+        # Run CePO generation in executor (it may use subprocess)
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.generate_with_cepo(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                **kwargs
+            )
+        )
+
     def calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """
         Calculate cost based on Cerebras pricing tiers.

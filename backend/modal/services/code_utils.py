@@ -11,7 +11,6 @@ This module provides functions to clean up AI-generated Manim code by:
 
 import re
 
-
 # ============================================================================
 # TTS Configuration Fixes (from code_cleanup.py)
 # ============================================================================
@@ -428,7 +427,6 @@ def apply_all_manual_fixes(code: str) -> str:
     print("🔧 Applying manual code fixes...")
 
     # Order matters!
-    code = remove_placeholders(code)  # Remove placeholders first
     code = remove_camera_orientation_calls(code)
     code = fix_scene_inheritance(code)
     code = ensure_voiceover_imports(code)

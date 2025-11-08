@@ -68,16 +68,26 @@ def generate_educational_video_logic(
         print(f"{'='*60}\n")
         capture_log(f"Starting video generation - Job: {job_id}, Topic: {prompt}")
 
-        # Initialize LLM service
+        # Initialize LLM services
         from services.llm import create_llm_service
 
-        provider = "cerebras"
-        model = "qwen-3-235b-a22b-thinking-2507"
+        # Cerebras Qwen-3 for plan generation (STAGE 1)
+        plan_provider = "cerebras"
+        plan_model = "qwen-3-235b-a22b-instruct-2507"
 
-        print(f"🔧 Initializing {provider} {model} service...")
-        llm_service = create_llm_service(provider=provider, model=model)
-        print(f"✓ {provider} {model} service initialized\n")
-        capture_log(f"{provider} {model} service initialized")
+        print(f"🔧 Initializing {plan_provider} {plan_model} service for plan generation...")
+        plan_llm_service = create_llm_service(provider=plan_provider, model=plan_model)
+        print(f"✓ {plan_provider} {plan_model} service initialized\n")
+        capture_log(f"{plan_provider} {plan_model} service initialized for plan generation")
+
+        # Anthropic Sonnet 4.5 for code generation (STAGE 2)
+        code_provider = "anthropic"
+        code_model = "claude-sonnet-4-5-20250929"
+
+        print(f"🔧 Initializing {code_provider} {code_model} service for code generation...")
+        code_llm_service = create_llm_service(provider=code_provider, model=code_model)
+        print(f"✓ {code_provider} {code_model} service initialized\n")
+        capture_log(f"{code_provider} {code_model} service initialized for code generation")
 
         # STAGE 1: Generate Mega Plan with Structured Output
         print(f"\n{'─'*60}")
@@ -103,14 +113,14 @@ def generate_educational_video_logic(
             print(f"🖼️  Image context provided - will be included in plan generation")
             print(f"⚠️  Note: Cerebras may not support multimodal images. Image context will be described in text.")
 
-        print(f"🤖 Calling {provider} {model} for plan generation...")
-        print(f"   Model: {model}")
+        print(f"🤖 Calling {plan_provider} {plan_model} for plan generation...")
+        print(f"   Model: {plan_model}")
         print(f"   Temperature: {TEMP}")
         print(f"   Max tokens: {MAX_TOKENS}")
 
         # Note: Cerebras may not support multimodal images like Anthropic
         # For now, we'll use text-only generation even when image_context is provided
-        plan_response = llm_service.generate_simple(
+        plan_response = plan_llm_service.generate_simple(
             prompt=plan_prompt,
             max_tokens=MAX_TOKENS,
             temperature=TEMP
@@ -265,8 +275,8 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 if image_context:
                     section_prompt += "\n\nNOTE: An image was provided as context for this video. When creating visual demonstrations, consider referencing elements or concepts visible in that image."
 
-                print(f"🤖 [Async {section_num}] Calling {provider} {model} for code generation (async)...")
-                print(f"   Model: {model}")
+                print(f"🤖 [Async {section_num}] Calling {code_provider} {code_model} for code generation (async)...")
+                print(f"   Model: {code_model}")
                 print(f"   Temperature: {TEMP}")
                 print(f"   Max tokens: {MAX_TOKENS}")
                 if image_context:
@@ -276,7 +286,7 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 # Note: Cerebras may not support multimodal images like Anthropic
                 # For now, we'll use text-only generation even when image_context is provided
                 # Text-only API call using llm service - ALL happen in parallel!
-                manim_code = await llm_service.generate_simple_async(
+                manim_code = await code_llm_service.generate_simple_async(
                     prompt=section_prompt,
                     max_tokens=MAX_TOKENS,
                     temperature=TEMP
