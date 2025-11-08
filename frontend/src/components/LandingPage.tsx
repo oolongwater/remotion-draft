@@ -8,9 +8,10 @@ import React, { useState } from 'react';
 
 interface LandingPageProps {
   onSubmit: (topic: string) => void;
+  onTestMode?: () => void; // NEW: For testing with hardcoded data
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }) => {
   const [topic, setTopic] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   
@@ -99,6 +100,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit }) => {
               </button>
             ))}
           </div>
+          
+          {/* ===== TEST BUTTON - EASILY REMOVABLE ===== */}
+          {onTestMode && (
+            <div className="mt-6 pt-6 border-t border-slate-700/50">
+              <button
+                onClick={onTestMode}
+                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+              >
+                🧪 Test Mode: Pre-loaded 2-Segment Video
+              </button>
+              <p className="text-slate-500 text-xs mt-2 text-center">
+                Test with hardcoded video data (for development)
+              </p>
+            </div>
+          )}
+          {/* ===== END TEST BUTTON ===== */}
         </div>
         
         {/* Feature Highlights */}

@@ -33,15 +33,32 @@ export const App: React.FC = () => {
   
   // Track when segment changes to restart playback
   const [segmentKey, setSegmentKey] = useState(0);
+  
+  // ===== TEST MODE - EASILY REMOVABLE =====
+  const [isTestMode, setIsTestMode] = useState(false);
+  // ===== END TEST MODE =====
 
   /**
    * Handle topic submission from landing page
    */
   const handleTopicSubmit = async (topic: string) => {
     setCurrentTopic(topic);
+    setIsTestMode(false); // Normal mode
     setAppState('learning');
     setError('');
   };
+  
+  // ===== TEST MODE - EASILY REMOVABLE =====
+  /**
+   * Handle test mode activation with hardcoded data
+   */
+  const handleTestMode = () => {
+    setCurrentTopic('Test Topic: Understanding Machine Learning');
+    setIsTestMode(true);
+    setAppState('learning');
+    setError('');
+  };
+  // ===== END TEST MODE =====
   
   /**
    * Handle errors from VideoController
@@ -70,11 +87,17 @@ export const App: React.FC = () => {
     setAppState('landing');
     setCurrentTopic('');
     setError('');
+    setIsTestMode(false); // Reset test mode
   };
 
   // Render based on app state
   if (appState === 'landing') {
-    return <LandingPage onSubmit={handleTopicSubmit} />;
+    return (
+      <LandingPage 
+        onSubmit={handleTopicSubmit}
+        onTestMode={handleTestMode} // Pass test mode handler
+      />
+    );
   }
   
   if (appState === 'error') {
@@ -88,6 +111,7 @@ export const App: React.FC = () => {
         <VideoController
           initialTopic={currentTopic}
           onError={handleVideoError}
+          isTestMode={isTestMode} // Pass test mode flag
         >
           {({
             session,

@@ -53,7 +53,57 @@ interface VideoControllerProps {
   initialTopic: string;
   onError?: (error: string) => void;
   children: (state: VideoControllerState) => React.ReactNode;
+  isTestMode?: boolean; // NEW: Use hardcoded test data instead of generating
 }
+
+// ===== TEST DATA - EASILY REMOVABLE =====
+/**
+ * Create hardcoded test session with 2 video segments
+ * Uses public test videos from the internet
+ */
+function createTestSession(topic: string): VideoSession {
+  return {
+    segments: [
+      {
+        id: 'test_segment_1',
+        manimCode: '',
+        duration: 30,
+        hasQuestion: true,
+        questionText: 'What are the three main types of machine learning mentioned?',
+        topic: topic,
+        difficulty: 'medium',
+        generatedAt: new Date().toISOString(),
+        // Big Buck Bunny - a popular open-source test video
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        renderingStatus: 'completed',
+      },
+      {
+        id: 'test_segment_2',
+        manimCode: '',
+        duration: 30,
+        hasQuestion: false,
+        topic: topic,
+        difficulty: 'medium',
+        generatedAt: new Date().toISOString(),
+        // Elephant's Dream - another open-source test video
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+        renderingStatus: 'completed',
+      },
+    ],
+    currentIndex: 0,
+    context: {
+      initialTopic: topic,
+      historyTopics: [topic],
+      depth: 0,
+      correctnessPattern: [],
+      preferredStyle: 'mixed',
+    },
+    sessionId: `test_session_${Date.now()}`,
+    startedAt: new Date().toISOString(),
+    lastUpdatedAt: new Date().toISOString(),
+  };
+}
+// ===== END TEST DATA =====
 
 /**
  * VideoController Component
@@ -64,11 +114,14 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   initialTopic,
   onError,
   children,
+  isTestMode = false, // Default to normal mode
 }) => {
   // Session state
+  // ===== TEST MODE - EASILY REMOVABLE =====
   const [session, setSession] = useState<VideoSession>(() =>
-    createVideoSession(initialTopic)
+    isTestMode ? createTestSession(initialTopic) : createVideoSession(initialTopic)
   );
+  // ===== END TEST MODE =====
   
   // Loading states
   const [isGenerating, setIsGenerating] = useState(false);
@@ -87,6 +140,14 @@ export const VideoController: React.FC<VideoControllerProps> = ({
    * Generate the first segment when component mounts
    */
   useEffect(() => {
+    // ===== TEST MODE - EASILY REMOVABLE =====
+    // Skip generation in test mode (test data already loaded)
+    if (isTestMode) {
+      console.log('Test mode active - using hardcoded video data');
+      return;
+    }
+    // ===== END TEST MODE =====
+    
     if (session.segments.length === 0 && !isGenerating) {
       console.log('Generating initial segment for topic:', session.context.initialTopic);
       generateInitialSegment();
