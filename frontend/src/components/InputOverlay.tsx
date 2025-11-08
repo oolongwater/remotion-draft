@@ -19,7 +19,7 @@ interface InputOverlayProps {
   onRequestNext: () => void;
   onNewTopic: (topic: string) => void;
   onReset: () => void;
-  onCreateBranch: (branchLabel?: string) => void;
+  onAskQuestion: (question: string) => void;
   currentNodeNumber: string;
 }
 
@@ -32,7 +32,7 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
   onRequestNext,
   onNewTopic,
   onReset,
-  onCreateBranch,
+  onAskQuestion,
   currentNodeNumber,
 }) => {
   const [input, setInput] = useState("");
@@ -152,7 +152,7 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
           <div className="mt-4 flex flex-col gap-3">
             {/* Branch Button */}
             <BranchButton
-              onBranch={onCreateBranch}
+              onAskQuestion={onAskQuestion}
               disabled={isEvaluating || isGenerating}
             />
             
@@ -214,7 +214,7 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
           
           {/* Branch Button */}
           <BranchButton
-            onBranch={onCreateBranch}
+            onAskQuestion={onAskQuestion}
             disabled={isGenerating}
           />
           

@@ -28,6 +28,7 @@ import {
   evaluateAnswer,
 } from '../services/llmService';
 import { generateVideoScenes, GenerationProgress } from '../services/videoRenderService';
+import { analyzeQuestion } from '../services/questionAnalysisService';
 
 /**
  * Props for VideoController render function
@@ -57,7 +58,7 @@ export interface VideoControllerState {
   requestNextSegment: () => Promise<void>;
   requestNewTopic: (topic: string) => Promise<void>;
   navigateToNode: (nodeId: string) => void;
-  createBranch: (branchLabel?: string) => void;
+  handleQuestionBranch: (question: string) => Promise<void>;
   
   // Legacy - kept for backward compatibility
   goToSegment: (index: number) => void;
@@ -455,44 +456,133 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   }, [session]);
   
   /**
-   * Create a branch from current node (placeholder for future question feature)
+   * Handle user question and create a branch with answer videos
    */
-  const createBranch = useCallback((branchLabel?: string) => {
-    if (!currentNode) {
+  const handleQuestionBranch = useCallback(async (question: string) => {
+    if (!currentNode || !currentSegment) {
       console.warn('No current node to branch from');
       return;
     }
     
-    // Create a dummy segment for testing
-    const dummySegment: VideoSegment = {
-      id: `branch_${Date.now()}`,
-      manimCode: '',
-      duration: 30,
-      hasQuestion: false,
-      questionText: undefined,
-      topic: `Branch from ${currentSegment?.topic || 'unknown'}`,
-      difficulty: 'medium',
-      generatedAt: new Date().toISOString(),
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      renderingStatus: 'completed',
-    };
+    setIsGenerating(true);
+    setError(null);
+    setGenerationProgress(undefined);
     
-    // Add as child node
-    const newNode = addChildNode(
-      session.tree,
-      currentNode.id,
-      dummySegment,
-      branchLabel || 'New Branch'
-    );
-    
-    // Navigate to the new branch
-    navigateToNodeHelper(session.tree, newNode.id);
-    
-    setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
-    saveLearningTree(session.sessionId, session.tree);
-    
-    console.log('Created new branch:', branchLabel || 'New Branch');
-  }, [currentNode, currentSegment, session]);
+    try {
+      console.log('Analyzing question:', question);
+      
+      // Step 1: Analyze the question to get learning phases
+      const analysisResult = await analyzeQuestion(
+        question,
+        currentSegment.topic,
+        session.context
+      );
+      
+      if (!analysisResult.success || !analysisResult.phases) {
+        const errorMsg = analysisResult.error || 'Failed to analyze question';
+        setError(errorMsg);
+        onError?.(errorMsg);
+        setIsGenerating(false);
+        return;
+      }
+      
+      const { phases } = analysisResult;
+      console.log(`Question analysis complete: ${phases.length} videos needed`);
+      console.log('Phases:', phases.map(p => p.sub_topic).join(', '));
+      
+      // Step 2: Generate videos for each phase
+      let firstNewNodeId: string | null = null;
+      let currentParentNodeId = currentNode.id;
+      
+      for (let i = 0; i < phases.length; i++) {
+        const phase = phases[i];
+        console.log(`Generating video ${i + 1}/${phases.length}: ${phase.sub_topic}`);
+        
+        setGenerationProgress({
+          status: 'processing',
+          stage: i + 1,
+          stage_name: phase.sub_topic,
+          progress_percentage: Math.round(((i + 1) / phases.length) * 100),
+          message: `Generating video for: ${phase.sub_topic}`,
+        });
+        
+        // Build contextual topic that includes parent topic and original question
+        const contextualTopic = `${currentSegment.topic} - ${phase.sub_topic}. Context: User asked "${question}"`;
+        
+        // Generate video for this phase using Modal backend with full context
+        const result = await generateVideoScenes(contextualTopic, (progress) => {
+          setGenerationProgress({
+            ...progress,
+            stage: i + 1,
+            stage_name: phase.sub_topic,
+          });
+        });
+        
+        if (result.success && result.sections && result.sections.length > 0) {
+          // Create segment from first section (we only need one video per phase)
+          const videoUrl = result.sections[0];
+          
+          const newSegment: VideoSegment = {
+            id: `question_phase_${Date.now()}_${i}`,
+            manimCode: '',
+            duration: 90,
+            hasQuestion: i < phases.length - 1, // Only last video has no question
+            questionText: i < phases.length - 1 
+              ? 'Do you understand this part?' 
+              : undefined,
+            topic: phase.sub_topic,
+            difficulty: 'medium',
+            generatedAt: new Date().toISOString(),
+            videoUrl: videoUrl,
+            renderingStatus: 'completed',
+          };
+          
+          // Add as child node with sub_topic as label
+          const newNode = addChildNode(
+            session.tree,
+            currentParentNodeId,
+            newSegment,
+            phase.sub_topic
+          );
+          
+          // Track first node to navigate to it later
+          if (i === 0) {
+            firstNewNodeId = newNode.id;
+          }
+          
+          // For linear chain: next phase branches from this node
+          currentParentNodeId = newNode.id;
+          
+          console.log(`✓ Created node ${i + 1}: ${phase.sub_topic}`);
+        } else {
+          const errorMsg = result.error || `Failed to generate video for: ${phase.sub_topic}`;
+          console.error(errorMsg);
+          // Continue with remaining phases even if one fails
+        }
+      }
+      
+      // Step 3: Navigate to first video in the branch
+      if (firstNewNodeId) {
+        navigateToNodeHelper(session.tree, firstNewNodeId);
+        setSession((prev) => ({ ...prev, lastUpdatedAt: new Date().toISOString() }));
+        saveLearningTree(session.sessionId, session.tree);
+        
+        console.log(`✓ Question branch created with ${phases.length} videos`);
+        console.log(`Navigated to first video: ${phases[0].sub_topic}`);
+      } else {
+        setError('Failed to create any videos for the question');
+      }
+      
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMsg);
+      onError?.(errorMsg);
+      console.error('Question branch error:', err);
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(undefined);
+    }
+  }, [currentNode, currentSegment, session, onError]);
   
   /**
    * Navigate to a specific segment by index (legacy compatibility)
@@ -517,7 +607,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     requestNextSegment,
     requestNewTopic,
     navigateToNode,
-    createBranch,
+    handleQuestionBranch,
     goToSegment,
   };
   
