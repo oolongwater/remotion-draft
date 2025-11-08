@@ -492,18 +492,9 @@ export const App: React.FC = () => {
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col items-center justify-center relative">
-                  {/* Tree Visualizer - mini tree preview */}
-                  {session.tree.nodes.size > 0 && (
-                    <TreeVisualizer
-                      tree={session.tree}
-                      onExpandClick={() => setShowTreeExplorer(true)}
-                      className="absolute top-4 right-4 z-50"
-                    />
-                  )}
-
+                <div className="flex-1 flex flex-col items-center justify-center relative p-4">
                   {/* Video Player Container with Navigation */}
-                  <div className="flex items-center gap-4 px-4">
+                  <div className="flex items-center gap-4 mb-4">
                   {/* Previous Button */}
                   <button
                     onClick={() => {
@@ -653,6 +644,17 @@ export const App: React.FC = () => {
                     </svg>
                   </button>
                 </div>
+
+                  {/* Tree Visualizer - horizontal minimap below video */}
+                  {session.tree.nodes.size > 0 && (
+                    <div style={{ width: 'calc(100vw - 400px)', maxWidth: '1280px' }}>
+                      <TreeVisualizer
+                        tree={session.tree}
+                        onExpandClick={() => setShowTreeExplorer(true)}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
 
                   {/* Tree Explorer Modal */}
                   {showTreeExplorer && (

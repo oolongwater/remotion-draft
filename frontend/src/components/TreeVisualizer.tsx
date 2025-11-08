@@ -49,8 +49,8 @@ const TreeNode = ({ data }: NodeProps) => {
       onMouseLeave={() => setShowLabel(false)}
     >
       {/* Connection handles - invisible but necessary for edges */}
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
       
       {/* Show tiny thumbnail if available */}
       {hasThumbnail && (
@@ -66,7 +66,7 @@ const TreeNode = ({ data }: NodeProps) => {
       
       {/* Label tooltip on hover */}
       {showLabel && (data.nodeNumber || data.title) && (
-        <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg border border-slate-700 max-w-[200px]">
+        <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg border border-slate-700 max-w-[200px]">
           <div className="font-semibold">{data.nodeNumber}</div>
           {data.title && <div className="text-[10px] text-slate-300 mt-0.5 truncate">{data.title}</div>}
         </div>
@@ -102,10 +102,10 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
     
-    const nodeSpacing = 35;
+    const nodeSpacing = 35; // Horizontal spacing between nodes
     const nodeSize = 10;
     const currentNodeSize = 12;
-    const branchXOffset = 15; // X offset for branches
+    const branchYOffset = 15; // Y offset for branches
     
     // Color palette
     const nodeColors = ['#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#ef4444'];
@@ -149,20 +149,20 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const endLevel = Math.min(nodeLevels.length - 1, currentLevel + 5);
     
     // Calculate center position - where the current node should be
-    // We want it centered in the viewport, not at the top
-    const centerY = 0; // This will be the "center" - React Flow will center on current node
+    // We want it centered in the viewport
+    const centerX = 0; // This will be the "center" - React Flow will center on current node
     
-    // Center X position for narrow sidebar (60 = middle of 120px width)
-    const centerX = 60;
+    // Center Y position for horizontal layout (30 = middle of 60px height)
+    const centerY = 30;
     
-    // Position nodes relative to current node being at centerY
+    // Position nodes relative to current node being at centerX
     for (let level = startLevel; level <= endLevel; level++) {
       const nodesAtLevel = nodeLevels[level] || [];
       
-      // Calculate Y position relative to current node being centered
-      const yPosition = (level - currentLevel) * nodeSpacing;
+      // Calculate X position relative to current node being centered (horizontal now)
+      const xPosition = (level - currentLevel) * nodeSpacing;
       
-      // If multiple nodes at this level, offset them horizontally
+      // If multiple nodes at this level, offset them vertically
       const totalNodesAtLevel = nodesAtLevel.length;
       
       nodesAtLevel.forEach((node, indexAtLevel) => {
@@ -171,19 +171,19 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         const nodeNumber = getNodeNumber(tree, node.id);
         const size = isCurrent ? currentNodeSize : nodeSize;
         
-        // Calculate X position - center the main path, offset branches
-        let xPos = centerX;
+        // Calculate Y position - center the main path, offset branches vertically
+        let yPos = centerY;
         if (totalNodesAtLevel > 1) {
-          // Multiple nodes at this level - spread them out
-          const offset = (indexAtLevel - (totalNodesAtLevel - 1) / 2) * branchXOffset;
-          xPos = centerX + offset;
+          // Multiple nodes at this level - spread them out vertically
+          const offset = (indexAtLevel - (totalNodesAtLevel - 1) / 2) * branchYOffset;
+          yPos = centerY + offset;
         }
         
         // Color based on branch
         const colorIndex = node.branchIndex % nodeColors.length;
         const nodeColor = isCurrent ? '#3b82f6' : nodeColors[colorIndex];
         
-        nodePositions.set(node.id, { x: xPos, y: yPosition });
+        nodePositions.set(node.id, { x: xPosition, y: yPos });
         
         newNodes.push({
           id: node.id,
@@ -194,7 +194,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             title: node.segment.title,
             thumbnailUrl: node.segment.thumbnailUrl,
           },
-          position: { x: xPos, y: yPosition },
+          position: { x: xPosition, y: yPos },
           style: {
             background: nodeColor,
             border: isCurrent ? '2px solid #60a5fa' : 'none',
@@ -248,17 +248,17 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   
   return (
     <div
-      className={`bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-lg overflow-hidden hover:bg-slate-800/90 transition-colors glow-border flex flex-col ${className}`}
-      style={{ width: '120px', height: 'calc(100vh - 120px)' }}
+      className={`bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-lg overflow-hidden hover:bg-slate-800/90 transition-colors glow-border relative ${className}`}
+      style={{ height: '80px', width: '100%', maxWidth: '100%' }}
     >
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
-        <div className="text-xs text-slate-400 font-medium">History</div>
+      {/* History tag in top-left */}
+      <div className="absolute top-2 left-2 bg-slate-700/80 rounded px-2 py-1 text-xs text-slate-400 font-medium z-10 pointer-events-none">
+        History
       </div>
       
       {/* Tree visualization */}
       <div 
-        className="flex-1 cursor-pointer relative"
+        className="w-full h-full cursor-pointer relative"
         onClick={handleNodeClick}
       >
         <ReactFlow
@@ -284,7 +284,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         </ReactFlow>
         
         {/* Expand hint overlay */}
-        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-slate-700/80 rounded px-2 py-1 text-xs text-slate-300 whitespace-nowrap pointer-events-none">
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-slate-700/80 rounded px-2 py-1 text-xs text-slate-300 whitespace-nowrap pointer-events-none">
           Click to expand
         </div>
       </div>

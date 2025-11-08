@@ -44,7 +44,7 @@ const ExplorerNode = ({ data }: NodeProps) => {
   const [imageError, setImageError] = useState(false);
 
   // Show thumbnail if available, otherwise show colored circle
-  const hasThumbnail = data.thumbnailUrl && !imageError;
+  const hasThumbnail = (data as any).thumbnailUrl && !imageError;
 
   return (
     <div
@@ -53,7 +53,7 @@ const ExplorerNode = ({ data }: NodeProps) => {
       onMouseLeave={() => setShowTooltip(false)}
     >
       {/* Connection handles */}
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
 
       {/* Node display - either thumbnail or circle */}
       <div className="relative">
@@ -62,43 +62,47 @@ const ExplorerNode = ({ data }: NodeProps) => {
           <div
             className="relative w-32 h-20 rounded-lg overflow-hidden shadow-lg"
             style={{
-              border: data.isCurrent
+              border: (data as any).isCurrent
                 ? "3px solid #60a5fa"
-                : `2px solid ${data.borderColor || "#3b82f6"}`,
-              boxShadow: data.isCurrent
+                : `2px solid ${(data as any).borderColor || "#3b82f6"}`,
+              boxShadow: (data as any).isCurrent
                 ? "0 0 30px rgba(59, 130, 246, 0.8), 0 4px 6px -1px rgba(0, 0, 0, 0.1)"
                 : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
             }}
           >
             <img
-              src={data.thumbnailUrl}
-              alt={data.title || data.topic || "Section thumbnail"}
+              src={(data as any).thumbnailUrl}
+              alt={
+                (data as any).title ||
+                (data as any).topic ||
+                "Section thumbnail"
+              }
               className="w-full h-full object-cover"
               onError={() => setImageError(true)}
             />
             {/* Node number badge on thumbnail */}
             <div
               className="absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md"
-              style={{ backgroundColor: data.nodeColor || "#3b82f6" }}
+              style={{ backgroundColor: (data as any).nodeColor || "#3b82f6" }}
             >
-              {data.nodeNumber}
+              {(data as any).nodeNumber}
             </div>
           </div>
         ) : (
           // Fallback to circle with number
           <div className="w-10 h-10 flex items-center justify-center font-bold text-xs">
-            {data.nodeNumber}
+            {(data as any).nodeNumber}
           </div>
         )}
       </div>
 
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
 
-      {/* Title label below node */}
-      {(data.title || data.topic) && (
-        <div className="max-w-[140px] text-center pointer-events-none">
-          <div className="text-xs text-white font-semibold bg-slate-900/80 px-2 py-1 rounded">
-            {data.title || data.topic}
+      {/* Title label below node - centered with text wrapping */}
+      {((data as any).title || (data as any).topic) && (
+        <div className="max-w-[160px] text-center pointer-events-none">
+          <div className="text-xs text-white font-semibold bg-slate-900/80 px-2 py-1 rounded break-words">
+            {(data as any).title || (data as any).topic}
           </div>
         </div>
       )}
@@ -106,16 +110,23 @@ const ExplorerNode = ({ data }: NodeProps) => {
       {/* Extended tooltip on hover with more details */}
       {showTooltip && (
         <div className="absolute left-full ml-3 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white text-sm px-3 py-2 rounded-lg z-50 pointer-events-none shadow-xl border border-slate-600 max-w-xs">
-          <div className="font-semibold text-blue-400">{data.nodeNumber}</div>
-          {data.title && (
-            <div className="text-sm font-medium mt-1">{data.title}</div>
+          <div className="font-semibold text-blue-400">
+            {(data as any).nodeNumber}
+          </div>
+          {(data as any).title && (
+            <div className="text-sm font-medium mt-1">
+              {(data as any).title}
+            </div>
           )}
-          {data.topic && data.topic !== data.title && (
-            <div className="text-xs text-slate-300 mt-1">{data.topic}</div>
-          )}
-          {data.voiceoverScript && (
+          {(data as any).topic &&
+            (data as any).topic !== (data as any).title && (
+              <div className="text-xs text-slate-300 mt-1">
+                {(data as any).topic}
+              </div>
+            )}
+          {(data as any).voiceoverScript && (
             <div className="text-xs text-slate-400 mt-2 max-h-20 overflow-y-auto">
-              {data.voiceoverScript.substring(0, 150)}...
+              {(data as any).voiceoverScript?.substring(0, 150)}...
             </div>
           )}
         </div>
@@ -131,6 +142,7 @@ const nodeTypes = {
 /**
  * Calculate hierarchical layout positions using a simple tree layout algorithm
  * Much more spread out for the full-screen view
+ * HORIZONTAL LAYOUT: left to right
  */
 function calculateTreeLayout(tree: LearningTree) {
   const positions = new Map<string, { x: number; y: number }>();
@@ -140,29 +152,29 @@ function calculateTreeLayout(tree: LearningTree) {
   function traverse(
     nodeId: string,
     level: number,
-    parentX: number,
+    parentY: number,
     childIndex: number,
     totalSiblings: number
   ) {
     const currentWidth = levelWidth.get(level) || 0;
     levelWidth.set(level, currentWidth + 1);
 
-    // Calculate x position based on parent and siblings - MUCH MORE SPACING
-    const horizontalSpacing = 400; // Wider spacing between siblings
-    const verticalSpacing = 250; // More vertical space between levels
-    const offsetX =
-      (childIndex - (totalSiblings - 1) / 2) * horizontalSpacing + parentX;
+    // Calculate y position based on parent and siblings - MUCH MORE SPACING
+    const verticalSpacing = 200; // Spacing between siblings (now vertical) - reduced since labels are below
+    const horizontalSpacing = 280; // Space between levels (now horizontal) - increased for labels
+    const offsetY =
+      (childIndex - (totalSiblings - 1) / 2) * verticalSpacing + parentY;
 
     positions.set(nodeId, {
-      x: offsetX,
-      y: level * verticalSpacing,
+      x: level * horizontalSpacing, // X is now the level (horizontal progression)
+      y: offsetY, // Y is now the offset (vertical branching)
     });
 
     // Get children and traverse
     const node = tree.nodes.get(nodeId);
     if (node && node.childIds.length > 0) {
       node.childIds.forEach((childId, index) => {
-        traverse(childId, level + 1, offsetX, index, node.childIds.length);
+        traverse(childId, level + 1, offsetY, index, node.childIds.length);
       });
     }
   }
@@ -217,7 +229,7 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
       const nodeColor = isCurrent ? "#3b82f6" : nodeColors[colorIndex];
 
       // Determine if this node has a thumbnail
-      const hasThumbnail = !!treeNode.segment.thumbnailUrl;
+      const hasThumbnail = !!(treeNode.segment as any).thumbnailUrl;
 
       return {
         id: treeNode.id,
@@ -225,16 +237,16 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
         data: {
           nodeNumber: nodeNumber,
           topic: treeNode.segment.topic,
-          title: treeNode.segment.title,
-          thumbnailUrl: treeNode.segment.thumbnailUrl,
+          title: (treeNode.segment as any).title,
+          thumbnailUrl: (treeNode.segment as any).thumbnailUrl,
           voiceoverScript: treeNode.segment.voiceoverScript,
           nodeColor: nodeColor,
           borderColor: isCurrent ? "#60a5fa" : nodeColor,
           isCurrent: isCurrent,
         },
         position,
-        sourcePosition: "bottom" as const,
-        targetPosition: "top" as const,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
         style: {
           background: hasThumbnail ? "transparent" : nodeColor,
           color: "#fff",
@@ -275,8 +287,6 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
             console.warn(`Child ${childId} not found in tree!`);
             return;
           }
-
-          const edgeLabel = child.branchLabel || "";
 
           // Color based on child's branch
           const colorIndex = (child.branchIndex || 0) % nodeColors.length;
