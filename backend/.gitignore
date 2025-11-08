@@ -1,0 +1,302 @@
+# Manim Educational Video Generator - .gitignore
+
+# ==============================================================================
+# Generated Content - Videos and Output Files
+# ==============================================================================
+
+# Output directories
+output/
+media/
+videos/
+renders/
+
+# Manim specific outputs
+*.mp4
+*.mov
+*.avi
+*.webm
+*.gif
+
+# Audio files
+*.mp3
+*.wav
+*.m4a
+*.aac
+
+# Image outputs
+*.png
+*.jpg
+*.jpeg
+*.svg
+
+# ==============================================================================
+# Python Cache and Bytecode
+# ==============================================================================
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# ==============================================================================
+# Environment and Configuration
+# ==============================================================================
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Virtual environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ==============================================================================
+# IDE and Editor Files
+# ==============================================================================
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ==============================================================================
+# System Files
+# ==============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==============================================================================
+# Logs and Temporary Files
+# ==============================================================================
+
+# Logs
+*.log
+logs/
+log/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ==============================================================================
+# API Keys and Secrets (Extra Protection)
+# ==============================================================================
+
+# API keys and secrets
+*key*
+*secret*
+*token*
+credentials.json
+config.json
+
+# But allow these specific files
+!requirements.txt
+!package.json
+!*.key.example
+
+# ==============================================================================
+# Manim Specific
+# ==============================================================================
+
+# Manim cache
+.manim_cache/
+
+# TeX temporary files
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.tex
+
+# ==============================================================================
+# AI/ML Generated Content
+# ==============================================================================
+
+# Generated code and plans
+generated/
+plans/
+mega_plans/
+critiques/
+
+# Model outputs
+outputs/
+results/
+
+# ==============================================================================
+# Database and Storage
+# ==============================================================================
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Database dumps
+*.sql
+*.dump
+
+# ==============================================================================
+# Modal/Cloud Deployment
+# ==============================================================================
+
+# Modal specific
+.modal/
+
+# Docker
+Dockerfile.tmp
+docker-compose.override.yml
+
+# ==============================================================================
+# Node.js (if using any frontend tools)
+# ==============================================================================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==============================================================================
+# Archives and Compressed Files
+# ==============================================================================
+
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+
+# ==============================================================================
+# Allow Important Files
+# ==============================================================================
+
+# Force include important config files even if they match patterns above
+!.gitignore
+!README.md
+!CLAUDE.md
+!LICENSE
+!requirements.txt
+!pyproject.toml
+!setup.py
+!Makefile
+
+# Allow example files
+!*.example
+!examples/
+!docs/
+!@docs/
+
+sa.json

@@ -6,31 +6,21 @@
  */
 
 /**
- * Color configuration for video segments
- */
-export interface ColorConfig {
-  background?: string;
-  primary?: string;
-  secondary?: string;
-  text?: string;
-  accent?: string;
-}
-
-/**
  * A single video segment in the learning journey
  */
 export interface VideoSegment {
   id: string;
-  componentCode: string; // JSX/TSX code to render
-  duration: number; // Duration in frames
+  manimCode: string; // Python Manim code to render
+  duration: number; // Duration in seconds
   hasQuestion: boolean; // Whether this segment ends with a question
   questionText?: string; // The question text if hasQuestion is true
   topic: string; // What topic this segment teaches
   difficulty: 'easy' | 'medium' | 'hard'; // Difficulty level
-  colors: ColorConfig;
   // Optional metadata
   generatedAt?: string;
   parentSegmentId?: string; // ID of the segment that led to this one
+  videoUrl?: string; // URL to the rendered video (set after rendering)
+  renderingStatus?: 'pending' | 'rendering' | 'completed' | 'failed'; // Status of video rendering
 }
 
 /**
@@ -76,11 +66,6 @@ export interface VideoSession {
   
   // Learning context for generating next segments
   context: LearningContext;
-  
-  // Global video settings
-  fps: number;
-  width: number;
-  height: number;
   
   // Session metadata
   sessionId: string;
@@ -151,9 +136,6 @@ export function createVideoSession(initialTopic: string): VideoSession {
     segments: [],
     currentIndex: 0,
     context: createInitialContext(initialTopic),
-    fps: 30,
-    width: 1280,
-    height: 720,
     sessionId: generateSessionId(),
     startedAt: new Date().toISOString(),
     lastUpdatedAt: new Date().toISOString(),

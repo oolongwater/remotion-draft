@@ -20,6 +20,7 @@ import {
   generateVideoSegment,
   evaluateAnswer,
 } from '../services/llmService';
+import { generateVideoScenes, GenerationProgress } from '../services/videoRenderService';
 
 /**
  * Props for VideoController render function
@@ -37,6 +38,9 @@ export interface VideoControllerState {
   
   // Error state
   error: string | null;
+  
+  // Generation progress (for SSE updates)
+  generationProgress?: GenerationProgress;
   
   // Actions
   handleAnswer: (answer: string) => Promise<void>;
@@ -73,6 +77,9 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   // Error state
   const [error, setError] = useState<string | null>(null);
   
+  // Generation progress
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | undefined>();
+  
   // Get current segment
   const currentSegment = session.segments[session.currentIndex] || null;
   
@@ -88,24 +95,55 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   }, []);
   
   /**
-   * Generate the initial video segment
+   * Generate all video scenes for the initial topic using Modal backend
    */
   const generateInitialSegment = async () => {
     setIsGenerating(true);
     setError(null);
+    setGenerationProgress(undefined);
     
     try {
-      const response = await generateVideoSegment(session.context);
+      const topic = session.context.initialTopic || 'a topic';
       
-      if (response.success && response.segment) {
+      const result = await generateVideoScenes(topic, (progress) => {
+        // Update progress state for UI
+        setGenerationProgress(progress);
+        console.log('Generation progress:', progress);
+      });
+      
+      if (result.success && result.sections && result.sections.length > 0) {
+        // Map section URLs to VideoSegments
+        const segments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
+          // Extract section number from URL (e.g., section_1.mp4 -> 1)
+          const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
+          const sectionNum = sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1;
+          
+          return {
+            id: `segment_${sectionNum}`,
+            manimCode: '', // Not needed since video is already rendered
+            duration: 90, // Default duration (could be improved with metadata)
+            hasQuestion: index < result.sections!.length - 1, // All but last have questions
+            questionText: index < result.sections!.length - 1 
+              ? 'What did you learn from this section?' 
+              : undefined,
+            topic: topic,
+            difficulty: 'medium',
+            generatedAt: new Date().toISOString(),
+            videoUrl: sectionUrl,
+            renderingStatus: 'completed', // Already rendered
+          };
+        });
+        
         setSession((prev) => ({
           ...prev,
-          segments: [response.segment!],
+          segments,
           currentIndex: 0,
           lastUpdatedAt: new Date().toISOString(),
         }));
+        
+        console.log(`Generated ${segments.length} video segments`);
       } else {
-        const errorMsg = response.error || 'Failed to generate video segment';
+        const errorMsg = result.error || 'Failed to generate video scenes';
         setError(errorMsg);
         onError?.(errorMsg);
       }
@@ -115,11 +153,13 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       onError?.(errorMsg);
     } finally {
       setIsGenerating(false);
+      setGenerationProgress(undefined);
     }
   };
   
   /**
    * Handle user's answer to a question
+   * Since all scenes are generated upfront, this evaluates the answer and navigates to next segment
    */
   const handleAnswer = useCallback(
     async (answer: string) => {
@@ -147,7 +187,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           return;
         }
         
-        const { correct, suggestedNextTopic, suggestedDifficulty } = evalResponse;
+        const { correct } = evalResponse;
         
         // Update correctness pattern
         const newPattern = [
@@ -173,40 +213,21 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         
         setIsEvaluating(false);
         
-        // Generate next segment with the updated context
-        setIsGenerating(true);
-        
-        const nextSegmentContext: LearningContext = {
-          ...updatedContext,
-          // Use suggested topic from evaluation if available
-          previousTopic: suggestedNextTopic || currentSegment.topic,
-        };
-        
-        const response = await generateVideoSegment(nextSegmentContext);
-        
-        if (response.success && response.segment) {
-          // Adjust difficulty if suggested
-          if (suggestedDifficulty) {
-            response.segment.difficulty = suggestedDifficulty;
-          }
-          
+        // Navigate to next segment (all scenes already generated)
+        if (session.currentIndex < session.segments.length - 1) {
           setSession((prev) => ({
             ...prev,
-            segments: [...prev.segments, response.segment!],
-            currentIndex: prev.segments.length, // Move to new segment
+            currentIndex: prev.currentIndex + 1,
             lastUpdatedAt: new Date().toISOString(),
           }));
         } else {
-          const errorMsg = response.error || 'Failed to generate next segment';
-          setError(errorMsg);
-          onError?.(errorMsg);
+          console.log('Reached end of available segments after answering');
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMsg);
         onError?.(errorMsg);
-      } finally {
-        setIsGenerating(false);
+        setIsEvaluating(false);
       }
     },
     [currentSegment, session, onError]
@@ -215,52 +236,32 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   /**
    * Request next segment without answering a question
    * (for segments that don't have questions)
+   * Since all scenes are generated upfront, this just navigates to the next segment
    */
   const requestNextSegment = useCallback(async () => {
-    setIsGenerating(true);
-    setError(null);
-    
-    try {
-      // Update context
-      const updatedContext = updateContext(session.context, {
-        previousTopic: currentSegment?.topic,
-        historyTopics: currentSegment
-          ? [...session.context.historyTopics, currentSegment.topic]
-          : session.context.historyTopics,
-        depth: session.context.depth + 1,
-      });
-      
-      const response = await generateVideoSegment(updatedContext);
-      
-      if (response.success && response.segment) {
-        setSession((prev) => ({
-          ...prev,
-          segments: [...prev.segments, response.segment!],
-          currentIndex: prev.segments.length,
-          context: updatedContext,
-          lastUpdatedAt: new Date().toISOString(),
-        }));
-      } else {
-        const errorMsg = response.error || 'Failed to generate next segment';
-        setError(errorMsg);
-        onError?.(errorMsg);
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMsg);
-      onError?.(errorMsg);
-    } finally {
-      setIsGenerating(false);
+    // If there's a next segment available, navigate to it
+    if (session.currentIndex < session.segments.length - 1) {
+      setSession((prev) => ({
+        ...prev,
+        currentIndex: prev.currentIndex + 1,
+        lastUpdatedAt: new Date().toISOString(),
+      }));
+    } else {
+      // At the end of segments - could generate more or show completion message
+      console.log('Reached end of available segments');
+      // For now, just log - could trigger new generation if needed
     }
-  }, [session, currentSegment, onError]);
+  }, [session]);
   
   /**
    * Request a completely new topic (pivot)
+   * Generates all scenes for the new topic using Modal backend
    */
   const requestNewTopic = useCallback(
     async (newTopic: string) => {
       setIsGenerating(true);
       setError(null);
+      setGenerationProgress(undefined);
       
       try {
         // Create fresh context for new topic
@@ -270,18 +271,45 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           historyTopics: [...session.context.historyTopics, newTopic],
         });
         
-        const response = await generateVideoSegment(newContext);
+        const result = await generateVideoScenes(newTopic, (progress) => {
+          setGenerationProgress(progress);
+          console.log('Generation progress for new topic:', progress);
+        });
         
-        if (response.success && response.segment) {
+        if (result.success && result.sections && result.sections.length > 0) {
+          // Map section URLs to VideoSegments
+          const newSegments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
+            const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
+            const sectionNum = sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1;
+            
+            return {
+              id: `segment_${Date.now()}_${sectionNum}`,
+              manimCode: '',
+              duration: 90,
+              hasQuestion: index < result.sections!.length - 1,
+              questionText: index < result.sections!.length - 1 
+                ? 'What did you learn from this section?' 
+                : undefined,
+              topic: newTopic,
+              difficulty: 'medium',
+              generatedAt: new Date().toISOString(),
+              videoUrl: sectionUrl,
+              renderingStatus: 'completed',
+            };
+          });
+          
+          // Append new segments to existing ones
           setSession((prev) => ({
             ...prev,
-            segments: [...prev.segments, response.segment!],
-            currentIndex: prev.segments.length,
+            segments: [...prev.segments, ...newSegments],
+            currentIndex: prev.segments.length, // Navigate to first new segment
             context: newContext,
             lastUpdatedAt: new Date().toISOString(),
           }));
+          
+          console.log(`Generated ${newSegments.length} video segments for new topic: ${newTopic}`);
         } else {
-          const errorMsg = response.error || 'Failed to generate segment for new topic';
+          const errorMsg = result.error || 'Failed to generate video scenes for new topic';
           setError(errorMsg);
           onError?.(errorMsg);
         }
@@ -291,6 +319,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         onError?.(errorMsg);
       } finally {
         setIsGenerating(false);
+        setGenerationProgress(undefined);
       }
     },
     [session, onError]
@@ -316,6 +345,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     isGenerating,
     isEvaluating,
     error,
+    generationProgress,
     handleAnswer,
     requestNextSegment,
     requestNewTopic,

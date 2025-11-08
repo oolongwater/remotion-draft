@@ -12,7 +12,6 @@ import {
   LearningContext,
   GenerateSegmentResponse,
   EvaluateAnswerResponse,
-  ColorConfig,
 } from '../types/VideoConfig';
 
 /**
@@ -86,7 +85,7 @@ export async function generateVideoSegment(
     try {
       segmentData = JSON.parse(cleanedJSON);
       console.log('Parsed segment data:', {
-        hasComponentCode: !!segmentData.componentCode,
+        hasManimCode: !!segmentData.manimCode,
         duration: segmentData.duration,
         hasQuestion: segmentData.hasQuestion,
         topic: segmentData.topic,
@@ -111,15 +110,15 @@ export async function generateVideoSegment(
     
     const segment: VideoSegment = {
       id: generateSegmentId(),
-      componentCode: segmentData.componentCode,
-      duration: segmentData.duration || 300, // Default 10 seconds at 30fps
+      manimCode: segmentData.manimCode,
+      duration: segmentData.duration || 90, // Default 90 seconds
       hasQuestion: segmentData.hasQuestion || false,
       questionText: segmentData.questionText,
       topic: segmentData.topic || context.previousTopic || context.initialTopic || 'Unknown',
       difficulty: segmentData.difficulty || 'medium',
-      colors: segmentData.colors || getDefaultColors(),
       generatedAt: new Date().toISOString(),
       parentSegmentId: context.depth > 0 ? `segment_${context.depth - 1}` : undefined,
+      videoUrl: undefined, // Will be set after rendering
     };
     
     return {
@@ -248,7 +247,10 @@ function buildSegmentPrompt(context: LearningContext): string {
     }
   }
   
-  return `You are generating an educational video segment for an infinite learning experience.
+  const ttsInit = `from tts import ElevenLabsTimedService
+        self.set_speech_service(ElevenLabsTimedService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None))`;
+  
+  return `You are an expert Manim animator creating educational explainer videos similar to 3Blue1Brown. Your task is to generate complete, runnable Manim code that creates an engaging explainer animation with exceptional spatial awareness and visual design.
 
 CONTEXT:
 - Topic: ${topicToTeach}
@@ -258,134 +260,115 @@ CONTEXT:
 - Depth in topic: ${depth}
 ${difficultyGuidance ? `- Guidance: ${difficultyGuidance}` : ''}
 
-YOUR TASK:
-Generate ONE video segment (10-20 seconds) that teaches about this topic in a flowing, video-essay style.
+## Core Principles:
+1. **VISUALIZE CONCEPTS, NOT JUST EQUATIONS**: Always create visual representations (shapes, diagrams, transformations) to demonstrate the concept - equations should support the visuals, not replace them
+2. **PERFECT SPATIAL ORGANIZATION**: Every element must be carefully positioned with explicit spacing to avoid any overlaps
+3. Use smooth transitions and pacing for educational clarity
+4. Include explanatory text alongside visual demonstrations with strategic placement
+5. Build concepts progressively from simple to complex with visual metaphors
+6. Use color coding and visual hierarchy to emphasize key concepts
+7. **SHOW, DON'T JUST TELL**: Use geometric objects, transformations, and visual metaphors to explain abstract concepts
+8. **IMPORTANT: End with a question to test understanding** (only skip for the very first intro segment)
 
-REQUIREMENTS:
-1. Create dynamic, kinetic animations - NOT static text on cards
-2. Use the available kinetic components for professional video-essay feel
-3. Make it feel like a real educational video (think YouTube explainers)
-4. **IMPORTANT: End with a question to test understanding** (only skip for the very first intro segment)
-5. Flow naturally - be creative with visual presentation
-6. Questions should be clear, specific, and test the concept just taught
+## CRITICAL TECHNICAL REQUIREMENTS:
+- **MANDATORY**: Generate a single complete Scene class that inherits from VoiceoverScene (NEVER use Scene)
+- **MANDATORY**: Include manim_voiceover imports and use self.voiceover() blocks
+- **MANDATORY**: Initialize TTS service in construct() method EXACTLY like this (NO OTHER PARAMETERS):
+  \`\`\`python
+  ${ttsInit}
+  \`\`\`
+- **CRITICAL**: ALWAYS use the EXACT voice_id and transcription_model=None shown above (this is REQUIRED)
+- **CRITICAL**: DO NOT use GTTSService, AzureService, or any other TTS service - ONLY the service specified above
+- **CRITICAL**: DO NOT enable transcription, subtitles, or captions - we do NOT need them
+- Include all necessary imports at the top
+- Use Manim Community Edition syntax (v0.18.1)
+- Ensure the code can be saved to a .py file and run with: manim -pql filename.py SceneName
+- **IMPORTANT**: Target video length: 45-90 seconds MAXIMUM (NEVER exceed 2 minutes)
+- Keep animations concise and focused on key concepts only
 
-AVAILABLE COMPONENTS (already imported in context):
+## Animation Structure (KEEP IT CONCISE - MAX 90 seconds total):
+1. **Introduction** (5-8 seconds): Title and brief overview with a visual teaser (show a key shape/diagram that will be explained)
+2. **Core Explanation** (30-50 seconds): Main VISUAL demonstration with step-by-step transformation/animation of objects - use shapes, arrows, transformations to show the concept, with equations as supporting elements only
+3. **Example** (15-20 seconds): ONE clear, practical example shown through visual objects interacting, transforming, or combining
+4. **Summary** (5-10 seconds): Key visual takeaway (show the final result visually, with minimal text)
+${isFirst ? '' : '5. **Question** (5-10 seconds): Display a clear question to test understanding of the concept just taught'}
 
-Text & Animation:
-- KineticText: React.createElement(KineticText, {text: 'string', flyFrom: 'left', easing: 'anticipation', byWord: true})
-- AnimatedText: React.createElement(AnimatedText, {text: 'string', animationType: 'fade'})
+## Visual Guidelines:
+- **PRIORITIZE VISUAL DEMONSTRATIONS**: Use geometric shapes, arrows, transformations, and diagrams FIRST - equations are supplementary
+- Use consistent color schemes (BLUE for primary objects, YELLOW for highlights, RED for important results, GREEN for correct/good)
+- Apply smooth animations with appropriate wait times (typically 0.5-2 seconds between transitions)
+- When showing equations, ALWAYS accompany them with visual interpretations (shapes, graphs, diagrams)
+- Include descriptive text with Text() for explanations, but keep text concise
+- Create visual metaphors and analogies appropriate to the topic (e.g., objects moving, transforming, combining)
+- Apply transformations (FadeIn, FadeOut, Transform, ReplacementTransform, Indicate) to show relationships and changes
+- Use VGroup() to group related elements together and animate them as units
 
-Layout & Containers:
-- AbsoluteFill: React.createElement(AbsoluteFill, {style: {...}}, children)
-- Card: React.createElement(Card, {title: 'string', subtitle: 'string'}, children)
-- TwoColumnLayout: React.createElement(TwoColumnLayout, {left: leftContent, right: rightContent})
-- SplitScreen: React.createElement(SplitScreen, {left: leftContent, right: rightContent})
+## CRITICAL SPATIAL PLACEMENT RULES (MUST FOLLOW):
+1. **MANDATORY Buff Distances**: ALWAYS use .next_to(), .to_edge(), .to_corner() with explicit buff parameter (minimum 0.5, recommended 0.7-1.0 for text)
+2. **NO OVERLAPS ALLOWED**: Before adding any element, consider existing elements' positions - maintain minimum 0.6 units separation
+3. **Screen Layout Zones**:
+   - TOP (y > 2.5): Titles and section headers only
+   - CENTER (-1.5 < y < 2.5): Main visual demonstrations and key objects
+   - BOTTOM (y < -1.5): Supporting text, conclusions, or secondary information
+   - LEFT (x < -2): Labels, descriptions, or "before" states
+   - RIGHT (x > 2): Results, "after" states, or conclusions
+4. **Visual Objects Spacing**: Position shapes, diagrams, and text with clear separation (minimum 0.6 units apart, 1.0+ for unrelated groups)
+5. **Dynamic Positioning**: When objects move, use VGroup() to move labels with them, or explicitly reposition labels using .animate
+6. **Text Placement Strategy**:
+   - Use .to_edge(UP, buff=0.7) for titles
+   - Use .to_corner(UL, buff=0.5) or .to_corner(UR, buff=0.5) for persistent labels
+   - Use .next_to(object, direction, buff=0.7) for object labels - never place text directly on top of objects
+7. **Size Awareness**: Larger font sizes need more spacing - use font_size=36 for titles, 28 for main text, 24 for labels
+8. **Equation Positioning**: When showing equations, position them to the side (LEFT or RIGHT * 3) while the visual demonstration occupies the center
+9. **Before Adding ANY Element**: Mentally check if it will overlap with existing elements - if yes, adjust position or remove old elements first
+10. **Consistent Alignment**: All text in a group should align (use VGroup and .arrange(DOWN, buff=0.5) for vertical stacks)
 
-Reveals & Transitions:
-- RevealBlock: React.createElement(RevealBlock, {type: 'wipe-right', delay: 60}, children)
-- Transition: React.createElement(Transition, {from: content1, to: content2, startFrame: 100})
+## Common Manim Patterns:
+- Creating shapes: Circle(), Square(), Triangle(), Line(), Arrow(), Dot()
+- Mathematical text: MathTex(r"\\formula"), Tex()
+- Regular text: Text("description", font_size=28)
+- Animations: Create(), Write(), FadeIn(), FadeOut(), Transform(), Shift(), Rotate(), Scale()
+- Grouping: VGroup(), Group()
+- Positioning: .to_edge(), .to_corner(), .next_to(), .shift()
+- Colors: BLUE, RED, GREEN, YELLOW, WHITE, PURPLE, ORANGE
+- Wait times: self.wait(seconds)
 
-Orchestration (REQUIRES ARRAYS):
-- Timeline: React.createElement(Timeline, {items: [{id: 'item1', startFrame: 0, duration: 30, animation: 'slide-up', content: element}]})
-- FloatingElements: React.createElement(FloatingElements, {elements: [{id: '1', content: '⭐', x: 10, y: 20}]})
+## CRITICAL - DO NOT RENDER CODE AS TEXT:
+❌ **NEVER DO THIS**: \`Text("MathTex(r'x^2')")\` - This renders the STRING "MathTex(r'x^2')" literally on screen
+✅ **CORRECT**: \`MathTex(r"x^2")\` - This actually renders the mathematical expression x²
+❌ **NEVER DO THIS**: Show variable names or code syntax as Text objects
+✅ **CORRECT**: Create actual Manim objects (MathTex, Circle, Square, etc.) - don't show their constructor calls as strings
 
-Code & Data:
-- CodeBlock: React.createElement(CodeBlock, {code: 'const x = 5;', language: 'javascript'})
-- Chart: React.createElement(Chart, {type: 'bar', data: [{label: 'A', value: 10}]})
-- Diagram: React.createElement(Diagram, {nodes: [...], edges: [...]})
-- ProgressBar: React.createElement(ProgressBar, {progress: 0.5})
+## CRITICAL - Functionality That Does NOT Exist in Manim:
+❌ **NEVER USE**: \`self.set_camera_orientation()\` - This method does NOT exist in Scene class
+❌ **NEVER USE**: \`self.begin_ambient_camera_rotation()\` - Only exists in ThreeDScene
+❌ **NEVER USE**: \`ThreeDAxes()\` unless you inherit from ThreeDScene
+❌ **NEVER USE**: \`GTTSService()\` - Use ElevenLabsTimedService() ONLY
+❌ **NEVER USE**: \`KokoroService()\` or any other TTS service
+✅ **CORRECT**: For standard Scene class, use only 2D elements: Axes(), NumberPlane(), .shift(), .move_to()
+✅ **CORRECT**: For 3D, you MUST inherit from ThreeDScene: \`class MyScene(ThreeDScene):\`
+✅ **CORRECT**: For audio, ALWAYS use: \`self.set_speech_service(ElevenLabsTimedService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None))\`
 
-REMOTION HOOKS AVAILABLE:
-- useCurrentFrame(): Get current animation frame
-- useVideoConfig(): Get fps, width, height
-- interpolate(): Animate between values
-- spring(): Physics-based animations
-- AbsoluteFill: Full-screen container
+REMEMBER: Focus on QUALITY over QUANTITY - one concept explained well in 90 seconds is better than rushing through multiple concepts. Adapt visual techniques to the topic while maintaining the same educational rigor used in mathematical explanations.
 
-CRITICAL SYNTAX RULES:
-1. Use React.createElement() ONLY - NO JSX angle brackets < >
-2. Syntax: React.createElement(Component, {props}, ...children)
-3. For HTML elements use strings: React.createElement('div', {props}, children)
-4. Multiple children must be separate arguments, NOT in an array
-5. Always check your parentheses balance!
-
-KEEP IT SIMPLE - START WITH THIS PATTERN:
-\`\`\`javascript
-const Scene = () => {
-  const frame = useCurrentFrame();
-  
-  return React.createElement(
-    AbsoluteFill,
-    {
-      style: {
-        backgroundColor: '#0f172a',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 60
-      }
-    },
-    React.createElement(
-      'div',
-      { style: { maxWidth: 1000, textAlign: 'center' } },
-      React.createElement(KineticText, {
-        text: 'Understanding React',
-        flyFrom: 'left',
-        easing: 'anticipation',
-        byWord: true,
-        style: { fontSize: 64, color: '#3b82f6', fontWeight: 'bold' }
-      }),
-      React.createElement(
-        'p',
-        { style: { fontSize: 28, color: '#cbd5e1', marginTop: 30 } },
-        'This is how React components work!'
-      )
-    )
-  );
-};
-\`\`\`
-
-KEEP CODE SIMPLE:
-- Use 2-3 components maximum per scene
-- Prefer simple elements like 'div', 'p', KineticText
-- Only use Timeline/FloatingElements if really needed
-- Always provide required props (especially arrays for Timeline/FloatingElements)
-
-FORMATTING TIPS:
-- Format each createElement call on its own line for clarity
-- Use proper indentation
-- Always match opening ( with closing )
-- Test mentally: count opening and closing parens
-
-WRONG (causes syntax errors):
-- React.createElement('div', {}, <p>text</p>)  ❌ NO JSX!
-- React.createElement('div', {}, [child1, child2])  ❌ NO arrays for children!
-- React.createElement('div' {})  ❌ Missing comma!
-
-CORRECT:
-- React.createElement('div', {}, React.createElement('p', {}, 'text'))  ✅
-- React.createElement('div', {}, child1, child2)  ✅
-- React.createElement('div', {style: {}})  ✅
+## Output Format:
+Generate only the Python code. Start with imports, follow with the Scene class. Make it self-contained and runnable. Include comments for complex sections. The animation should be educational, visually engaging, and accurate to the subject matter.
 
 RESPONSE FORMAT (JSON only, no markdown):
 {
-  "componentCode": "const Scene = () => { /* your kinetic React component */ };",
-  "duration": 300,
-  "hasQuestion": true,
-  "questionText": "What is the main concept we just learned?",
+  "manimCode": "from manim import *\\nimport numpy as np\\n\\nclass ExplainerScene(VoiceoverScene):\\n    def construct(self):\\n        # Your Manim code here\\n        ...",
+  "duration": 90,
+  "hasQuestion": ${isFirst ? 'false' : 'true'},
+  "questionText": "${isFirst ? '' : 'What is the main concept we just learned?'}",
   "topic": "${topicToTeach}",
-  "difficulty": "medium",
-  "colors": {
-    "background": "#0f172a",
-    "primary": "#3b82f6",
-    "text": "#e2e8f0",
-    "accent": "#fbbf24"
-  }
+  "difficulty": "medium"
 }
+
+IMPORTANT: The manimCode field should contain the complete Python code as a string with escaped newlines (\\n). Do not include markdown code blocks around the code.
 
 NOTE: Set hasQuestion to true and provide a questionText for most segments. Only set hasQuestion to false for introductory segments where asking a question doesn't make sense yet.
 
-Generate the video segment now:`;
+Generate the Manim code now:`;
 }
 
 /**
@@ -422,33 +405,27 @@ Response format (JSON only):
  */
 function validateSegmentData(data: any): boolean {
   if (!data || typeof data !== 'object') return false;
-  if (!data.componentCode || typeof data.componentCode !== 'string') return false;
+  if (!data.manimCode || typeof data.manimCode !== 'string') return false;
   if (data.hasQuestion && !data.questionText) return false;
   
-  // Check for common syntax issues in component code
-  const code = data.componentCode;
+  // Check for basic Manim code structure
+  const code = data.manimCode;
   
-  // Check for JSX syntax (angle brackets)
-  if (/<[A-Z]/.test(code) || /<\/[A-Z]/.test(code)) {
-    console.error('Component code contains JSX syntax - should use React.createElement');
+  // Check for required Manim imports
+  if (!code.includes('from manim import') && !code.includes('import manim')) {
+    console.error('Manim code missing required imports');
     return false;
   }
   
-  // Basic parentheses balance check
-  const openParens = (code.match(/\(/g) || []).length;
-  const closeParens = (code.match(/\)/g) || []).length;
-  if (openParens !== closeParens) {
-    console.error(`Unbalanced parentheses: ${openParens} opening, ${closeParens} closing`);
+  // Check for Scene class definition
+  if (!code.includes('class ') || (!code.includes('Scene') && !code.includes('VoiceoverScene'))) {
+    console.error('Manim code missing Scene class definition');
     return false;
   }
   
-  // Check for basic syntax validity
-  try {
-    // Try to parse it as JavaScript (won't execute, just parse)
-    // Don't add 'return' - the code defines a const, not an expression
-    new Function(code);
-  } catch (e) {
-    console.error('Component code has syntax error:', e);
+  // Check for construct method
+  if (!code.includes('def construct')) {
+    console.error('Manim code missing construct method');
     return false;
   }
   
@@ -481,18 +458,6 @@ function generateSegmentId(): string {
   return `segment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-/**
- * Get default color configuration
- */
-function getDefaultColors(): ColorConfig {
-  return {
-    background: '#0f172a',
-    primary: '#3b82f6',
-    secondary: '#8b5cf6',
-    text: '#e2e8f0',
-    accent: '#fbbf24',
-  };
-}
 
 /**
  * Legacy function for backward compatibility
@@ -510,24 +475,24 @@ export async function generateVideoConfig(topic: string): Promise<any> {
   const response = await generateVideoSegment(context);
   
   if (response.success && response.segment) {
-    // Convert to old format for compatibility
-    return {
-      success: true,
-      data: {
-        topic,
-        scenes: [
-          {
-            type: 'dynamic',
-            duration: response.segment.duration,
-            componentCode: response.segment.componentCode,
-            colors: response.segment.colors,
-          },
-        ],
-        fps: 30,
-        width: 1280,
-        height: 720,
-      },
-    };
+      // Convert to old format for compatibility
+      return {
+        success: true,
+        data: {
+          topic,
+          scenes: [
+            {
+              type: 'manim',
+              duration: response.segment.duration,
+              manimCode: response.segment.manimCode,
+              videoUrl: response.segment.videoUrl,
+            },
+          ],
+          fps: 30,
+          width: 1280,
+          height: 720,
+        },
+      };
   }
   
   return {

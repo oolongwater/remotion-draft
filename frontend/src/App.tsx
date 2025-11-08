@@ -8,13 +8,11 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Player, PlayerRef } from "@remotion/player";
 import { VideoController } from "./controllers/VideoController";
 import { InputOverlay } from "./components/InputOverlay";
 import { LandingPage } from "./components/LandingPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorDisplay } from "./components/ErrorDisplay";
-import { DynamicSceneRenderer } from "./remotion/DynamicSceneRenderer";
 
 /**
  * App state types
@@ -30,8 +28,8 @@ export const App: React.FC = () => {
   const [currentTopic, setCurrentTopic] = useState<string>('');
   const [error, setError] = useState<string>('');
   
-  // Reference to the Player for programmatic control
-  const playerRef = useRef<PlayerRef>(null);
+  // Reference to the video element for programmatic control
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   // Track when segment changes to restart playback
   const [segmentKey, setSegmentKey] = useState(0);
@@ -114,28 +112,28 @@ export const App: React.FC = () => {
             // IMPORTANT: Call all hooks BEFORE any conditional returns
             // Effect to restart video when segment changes
             useEffect(() => {
-              if (currentSegment) {
+              if (currentSegment && currentSegment.videoUrl && videoRef.current) {
                 setSegmentKey((prev) => prev + 1);
-                
-                if (playerRef.current) {
-                  playerRef.current.seekTo(0);
-                  playerRef.current.play();
-                }
+                videoRef.current.load();
+                videoRef.current.play().catch(console.error);
               }
-            }, [currentSegment?.id]);
+            }, [currentSegment?.id, currentSegment?.videoUrl]);
             
             // Check if video has ended and should auto-advance
             useEffect(() => {
-              if (currentSegment && !currentSegment.hasQuestion && !isGenerating) {
-                // Set up a timer to auto-generate next segment when video ends
-                const duration = (currentSegment.duration / session.fps) * 1000;
-                const timer = setTimeout(() => {
+              if (!videoRef.current) return;
+              
+              const handleVideoEnd = () => {
+                if (currentSegment && !currentSegment.hasQuestion && !isGenerating) {
                   requestNextSegment();
-                }, duration);
-                
-                return () => clearTimeout(timer);
-              }
-            }, [currentSegment, isGenerating, requestNextSegment, session.fps]);
+                }
+              };
+              
+              videoRef.current.addEventListener('ended', handleVideoEnd);
+              return () => {
+                videoRef.current?.removeEventListener('ended', handleVideoEnd);
+              };
+            }, [currentSegment, isGenerating, requestNextSegment]);
             
             // NOW we can do conditional returns
             
@@ -205,33 +203,39 @@ export const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* Remotion Player Container */}
+                {/* Video Player Container */}
                 <div className="relative shadow-2xl rounded-lg overflow-hidden bg-black" style={{ width: "90vw", maxWidth: "1280px" }}>
-                  <Player
-                    key={segmentKey}
-                    ref={playerRef}
-                    component={DynamicSceneRenderer}
-                    inputProps={{
-                      config: {
-                        type: 'dynamic' as const,
-                        id: currentSegment.id,
-                        duration: currentSegment.duration,
-                        componentCode: currentSegment.componentCode,
-                        colors: currentSegment.colors,
-                      },
-                    }}
-                    durationInFrames={currentSegment.duration}
-                    compositionWidth={session.width}
-                    compositionHeight={session.height}
-                    fps={session.fps}
-                    controls={false}
-                    loop={currentSegment.hasQuestion} // Loop if there's a question, otherwise play once
-                    style={{
-                      width: "100%",
-                    }}
-                    clickToPlay={false}
-                    autoPlay
-                  />
+                  {currentSegment.videoUrl ? (
+                    <video
+                      key={segmentKey}
+                      ref={videoRef}
+                      src={currentSegment.videoUrl}
+                      controls
+                      autoPlay
+                      loop={currentSegment.hasQuestion}
+                      className="w-full h-auto"
+                      style={{
+                        maxHeight: "80vh",
+                      }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  ) : currentSegment.renderingStatus === 'rendering' || currentSegment.renderingStatus === 'pending' ? (
+                    <div className="flex items-center justify-center" style={{ width: "100%", height: "450px" }}>
+                      <div className="text-center text-white">
+                        <LoadingSpinner />
+                        <div className="mt-4 text-lg">Rendering video...</div>
+                        <div className="mt-2 text-sm text-slate-400">This may take a minute</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center" style={{ width: "100%", height: "450px" }}>
+                      <div className="text-center text-white">
+                        <div className="text-lg mb-2">Video not available</div>
+                        <div className="text-sm text-slate-400">Rendering status: {currentSegment.renderingStatus || 'unknown'}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Input Overlay - shown when segment has a question or when loading next */}

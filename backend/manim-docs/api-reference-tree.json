@@ -1,0 +1,634 @@
+{
+  "baseUrl": "https://docs.manim.community/en/stable/reference/manim",
+  "categories": [
+    {
+      "category": "Animations",
+      "urlPrefix": "animation",
+      "modules": [
+        {
+          "name": "animation",
+          "path": "animation.animation",
+          "items": ["Add", "Animation", "Wait"]
+        },
+        {
+          "name": "changing",
+          "path": "animation.changing",
+          "items": ["AnimatedBoundary", "TracedPath"]
+        },
+        {
+          "name": "composition",
+          "path": "animation.composition",
+          "items": ["AnimationGroup", "LaggedStart", "LaggedStartMap", "Succession"]
+        },
+        {
+          "name": "creation",
+          "path": "animation.creation",
+          "items": [
+            "AddTextLetterByLetter",
+            "AddTextWordByWord",
+            "Create",
+            "DrawBorderThenFill",
+            "RemoveTextLetterByLetter",
+            "ShowIncreasingSubsets",
+            "ShowPartial",
+            "ShowSubmobjectsOneByOne",
+            "SpiralIn",
+            "TypeWithCursor",
+            "Uncreate",
+            "UntypeWithCursor",
+            "Unwrite",
+            "Write"
+          ]
+        },
+        {
+          "name": "fading",
+          "path": "animation.fading",
+          "items": ["FadeIn", "FadeOut"]
+        },
+        {
+          "name": "growing",
+          "path": "animation.growing",
+          "items": [
+            "GrowArrow",
+            "GrowFromCenter",
+            "GrowFromEdge",
+            "GrowFromPoint",
+            "SpinInFromNothing"
+          ]
+        },
+        {
+          "name": "indication",
+          "path": "animation.indication",
+          "items": [
+            "ApplyWave",
+            "Blink",
+            "Circumscribe",
+            "Flash",
+            "FocusOn",
+            "Indicate",
+            "ShowPassingFlash",
+            "ShowPassingFlashWithThinningStrokeWidth",
+            "Wiggle"
+          ]
+        },
+        {
+          "name": "movement",
+          "path": "animation.movement",
+          "items": [
+            "ComplexHomotopy",
+            "Homotopy",
+            "MoveAlongPath",
+            "PhaseFlow",
+            "SmoothedVectorizedHomotopy"
+          ]
+        },
+        {
+          "name": "numbers",
+          "path": "animation.numbers",
+          "items": ["ChangeDecimalToValue", "ChangingDecimal"]
+        },
+        {
+          "name": "rotation",
+          "path": "animation.rotation",
+          "items": ["Rotate", "Rotating"]
+        },
+        {
+          "name": "specialized",
+          "path": "animation.specialized",
+          "items": ["Broadcast"]
+        },
+        {
+          "name": "speedmodifier",
+          "path": "animation.speedmodifier",
+          "items": ["ChangeSpeed"]
+        },
+        {
+          "name": "transform",
+          "path": "animation.transform",
+          "items": [
+            "ApplyComplexFunction",
+            "ApplyFunction",
+            "ApplyMatrix",
+            "ApplyMethod",
+            "ApplyPointwiseFunction",
+            "ApplyPointwiseFunctionToCenter",
+            "ClockwiseTransform",
+            "CounterclockwiseTransform",
+            "CyclicReplace",
+            "FadeToColor",
+            "FadeTransform",
+            "FadeTransformPieces",
+            "MoveToTarget",
+            "ReplacementTransform",
+            "Restore",
+            "ScaleInPlace",
+            "ShrinkToCenter",
+            "Swap",
+            "Transform",
+            "TransformAnimations",
+            "TransformFromCopy"
+          ]
+        },
+        {
+          "name": "transform_matching_parts",
+          "path": "animation.transform_matching_parts",
+          "items": [
+            "TransformMatchingAbstractBase",
+            "TransformMatchingShapes",
+            "TransformMatchingTex"
+          ]
+        },
+        {
+          "name": "updaters",
+          "path": "animation.updaters",
+          "submodules": [
+            {
+              "name": "mobject_update_utils",
+              "path": "animation.updaters.mobject_update_utils",
+              "items": []
+            },
+            {
+              "name": "update",
+              "path": "animation.updaters.update",
+              "items": [
+                "MaintainPositionRelativeTo",
+                "UpdateFromAlphaFunc",
+                "UpdateFromFunc"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category": "Cameras",
+      "urlPrefix": "camera",
+      "modules": [
+        {
+          "name": "camera",
+          "path": "camera.camera",
+          "items": ["BackgroundColoredVMobjectDisplayer", "Camera"]
+        },
+        {
+          "name": "mapping_camera",
+          "path": "camera.mapping_camera",
+          "items": ["MappingCamera", "OldMultiCamera", "SplitScreenCamera"]
+        },
+        {
+          "name": "moving_camera",
+          "path": "camera.moving_camera",
+          "items": ["MovingCamera"]
+        },
+        {
+          "name": "multi_camera",
+          "path": "camera.multi_camera",
+          "items": ["MultiCamera"]
+        },
+        {
+          "name": "three_d_camera",
+          "path": "camera.three_d_camera",
+          "items": ["ThreeDCamera"]
+        }
+      ]
+    },
+    {
+      "category": "Configuration",
+      "urlPrefix": "_config",
+      "modules": [
+        {
+          "name": "_config",
+          "path": "_config",
+          "items": []
+        },
+        {
+          "name": "utils",
+          "path": "_config.utils",
+          "items": ["ManimConfig", "ManimFrame"]
+        },
+        {
+          "name": "logger_utils",
+          "path": "_config.logger_utils",
+          "items": ["JSONFormatter"]
+        }
+      ]
+    },
+    {
+      "category": "Mobjects",
+      "urlPrefix": "mobject",
+      "modules": [
+        {
+          "name": "frame",
+          "path": "mobject.frame",
+          "items": ["FullScreenRectangle", "ScreenRectangle"]
+        },
+        {
+          "name": "geometry",
+          "path": "mobject.geometry",
+          "submodules": [
+            {
+              "name": "arc",
+              "path": "mobject.geometry.arc",
+              "items": [
+                "AnnotationDot",
+                "AnnularSector",
+                "Annulus",
+                "Arc",
+                "ArcBetweenPoints",
+                "ArcPolygon",
+                "ArcPolygonFromArcs",
+                "Circle",
+                "CubicBezier",
+                "CurvedArrow",
+                "CurvedDoubleArrow",
+                "Dot",
+                "Ellipse",
+                "LabeledDot",
+                "Sector",
+                "TipableVMobject"
+              ]
+            },
+            {
+              "name": "boolean_ops",
+              "path": "mobject.geometry.boolean_ops",
+              "items": ["Difference", "Exclusion", "Intersection", "Union"]
+            },
+            {
+              "name": "labeled",
+              "path": "mobject.geometry.labeled",
+              "items": ["Label", "LabeledArrow", "LabeledLine", "LabeledPolygram"]
+            },
+            {
+              "name": "line",
+              "path": "mobject.geometry.line",
+              "items": [
+                "Angle",
+                "Arrow",
+                "DashedLine",
+                "DoubleArrow",
+                "Elbow",
+                "Line",
+                "RightAngle",
+                "TangentLine",
+                "Vector"
+              ]
+            },
+            {
+              "name": "polygram",
+              "path": "mobject.geometry.polygram",
+              "items": [
+                "ConvexHull",
+                "Cutout",
+                "Polygon",
+                "Polygram",
+                "Rectangle",
+                "RegularPolygon",
+                "RegularPolygram",
+                "RoundedRectangle",
+                "Square",
+                "Star",
+                "Triangle"
+              ]
+            },
+            {
+              "name": "shape_matchers",
+              "path": "mobject.geometry.shape_matchers",
+              "items": [
+                "BackgroundRectangle",
+                "Cross",
+                "SurroundingRectangle",
+                "Underline"
+              ]
+            },
+            {
+              "name": "tips",
+              "path": "mobject.geometry.tips",
+              "items": [
+                "ArrowCircleFilledTip",
+                "ArrowCircleTip",
+                "ArrowSquareFilledTip",
+                "ArrowSquareTip",
+                "ArrowTip",
+                "ArrowTriangleFilledTip",
+                "ArrowTriangleTip",
+                "StealthTip"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "graph",
+          "path": "mobject.graph",
+          "items": ["DiGraph", "GenericGraph", "Graph", "LayoutFunction"]
+        },
+        {
+          "name": "graphing",
+          "path": "mobject.graphing",
+          "submodules": [
+            {
+              "name": "coordinate_systems",
+              "path": "mobject.graphing.coordinate_systems",
+              "items": [
+                "Axes",
+                "ComplexPlane",
+                "CoordinateSystem",
+                "NumberPlane",
+                "PolarPlane",
+                "ThreeDAxes"
+              ]
+            },
+            {
+              "name": "functions",
+              "path": "mobject.graphing.functions",
+              "items": ["FunctionGraph", "ImplicitFunction", "ParametricFunction"]
+            },
+            {
+              "name": "number_line",
+              "path": "mobject.graphing.number_line",
+              "items": ["NumberLine", "UnitInterval"]
+            },
+            {
+              "name": "probability",
+              "path": "mobject.graphing.probability",
+              "items": ["BarChart", "SampleSpace"]
+            },
+            {
+              "name": "scale",
+              "path": "mobject.graphing.scale",
+              "items": ["LinearBase", "LogBase"]
+            }
+          ]
+        },
+        {
+          "name": "logo",
+          "path": "mobject.logo",
+          "items": ["ManimBanner"]
+        },
+        {
+          "name": "matrix",
+          "path": "mobject.matrix",
+          "items": ["DecimalMatrix", "IntegerMatrix", "Matrix", "MobjectMatrix"]
+        },
+        {
+          "name": "mobject",
+          "path": "mobject.mobject",
+          "items": ["Group", "Mobject"]
+        },
+        {
+          "name": "svg",
+          "path": "mobject.svg",
+          "submodules": [
+            {
+              "name": "brace",
+              "path": "mobject.svg.brace",
+              "items": [
+                "ArcBrace",
+                "Brace",
+                "BraceBetweenPoints",
+                "BraceLabel",
+                "BraceText"
+              ]
+            },
+            {
+              "name": "svg_mobject",
+              "path": "mobject.svg.svg_mobject",
+              "items": ["SVGMobject", "VMobjectFromSVGPath"]
+            }
+          ]
+        },
+        {
+          "name": "table",
+          "path": "mobject.table",
+          "items": [
+            "DecimalTable",
+            "IntegerTable",
+            "MathTable",
+            "MobjectTable",
+            "Table"
+          ]
+        },
+        {
+          "name": "text",
+          "path": "mobject.text",
+          "submodules": [
+            {
+              "name": "code_mobject",
+              "path": "mobject.text.code_mobject",
+              "items": ["Code"]
+            },
+            {
+              "name": "numbers",
+              "path": "mobject.text.numbers",
+              "items": ["DecimalNumber", "Integer", "Variable"]
+            },
+            {
+              "name": "tex_mobject",
+              "path": "mobject.text.tex_mobject",
+              "items": [
+                "BulletedList",
+                "MathTex",
+                "SingleStringMathTex",
+                "Tex",
+                "Title"
+              ]
+            },
+            {
+              "name": "text_mobject",
+              "path": "mobject.text.text_mobject",
+              "items": ["MarkupText", "Paragraph", "Text"]
+            }
+          ]
+        },
+        {
+          "name": "three_d",
+          "path": "mobject.three_d",
+          "submodules": [
+            {
+              "name": "three_dimensions",
+              "path": "mobject.three_d.three_dimensions",
+              "items": [
+                "Arrow3D",
+                "Cone",
+                "Cube",
+                "Cylinder",
+                "Dodecahedron",
+                "Dot3D",
+                "Icosahedron",
+                "Line3D",
+                "Octahedron",
+                "Prism",
+                "Sphere",
+                "Tetrahedron",
+                "Torus"
+              ]
+            },
+            {
+              "name": "polyhedra",
+              "path": "mobject.three_d.polyhedra",
+              "items": ["Polyhedron"]
+            },
+            {
+              "name": "three_d_utils",
+              "path": "mobject.three_d.three_d_utils",
+              "items": []
+            }
+          ]
+        },
+        {
+          "name": "types",
+          "path": "mobject.types",
+          "submodules": [
+            {
+              "name": "vectorized_mobject",
+              "path": "mobject.types.vectorized_mobject",
+              "items": ["VDict", "VGroup", "VMobject", "VectorizedPoint"]
+            }
+          ]
+        },
+        {
+          "name": "value_tracker",
+          "path": "mobject.value_tracker",
+          "items": ["ComplexValueTracker", "ValueTracker"]
+        }
+      ]
+    },
+    {
+      "category": "Scenes",
+      "urlPrefix": "scene",
+      "modules": [
+        {
+          "name": "moving_camera_scene",
+          "path": "scene.moving_camera_scene",
+          "items": ["MovingCameraScene", "ReconfigurableScene"]
+        },
+        {
+          "name": "scene",
+          "path": "scene.scene",
+          "items": ["RerunSceneHandler", "Scene"]
+        },
+        {
+          "name": "scene_file_writer",
+          "path": "scene.scene_file_writer",
+          "items": ["SceneFileWriter"]
+        },
+        {
+          "name": "section",
+          "path": "scene.section",
+          "items": ["DefaultSectionType", "Section"]
+        },
+        {
+          "name": "three_d_scene",
+          "path": "scene.three_d_scene",
+          "items": ["SpecialThreeDSceneConfig", "ThreeDScene"]
+        },
+        {
+          "name": "vector_space_scene",
+          "path": "scene.vector_space_scene",
+          "items": ["LinearTransformationScene", "VectorScene"]
+        },
+        {
+          "name": "zoomed_scene",
+          "path": "scene.zoomed_scene",
+          "items": ["ZoomedScene"]
+        }
+      ]
+    },
+    {
+      "category": "Utilities",
+      "urlPrefix": "utils",
+      "modules": [
+        {
+          "name": "bezier",
+          "path": "utils.bezier",
+          "items": []
+        },
+        {
+          "name": "color",
+          "path": "utils.color",
+          "items": ["AS2700", "BS381", "MANIM", "ManimColor", "X11", "XKCD"]
+        },
+        {
+          "name": "config_ops",
+          "path": "utils.config_ops",
+          "items": []
+        },
+        {
+          "name": "deprecation",
+          "path": "utils.deprecation",
+          "items": []
+        },
+        {
+          "name": "docbuild",
+          "path": "utils.docbuild",
+          "submodules": [
+            {
+              "name": "autoaliasattr_directive",
+              "path": "utils.docbuild.autoaliasattr_directive",
+              "items": ["AliasAttrDocumenter"]
+            }
+          ]
+        },
+        {
+          "name": "file_ops",
+          "path": "utils.file_ops",
+          "items": []
+        },
+        {
+          "name": "images",
+          "path": "utils.images",
+          "items": []
+        },
+        {
+          "name": "interactive",
+          "path": "utils.interactive",
+          "submodules": [
+            {
+              "name": "interactive_utils",
+              "path": "utils.interactive.interactive_utils",
+              "items": []
+            }
+          ]
+        },
+        {
+          "name": "ipython_magic",
+          "path": "utils.ipython_magic",
+          "items": []
+        },
+        {
+          "name": "iterables",
+          "path": "utils.iterables",
+          "items": []
+        },
+        {
+          "name": "paths",
+          "path": "utils.paths",
+          "items": []
+        },
+        {
+          "name": "rate_functions",
+          "path": "utils.rate_functions",
+          "items": []
+        },
+        {
+          "name": "simple_functions",
+          "path": "utils.simple_functions",
+          "items": []
+        },
+        {
+          "name": "sounds",
+          "path": "utils.sounds",
+          "items": []
+        },
+        {
+          "name": "space_ops",
+          "path": "utils.space_ops",
+          "items": []
+        },
+        {
+          "name": "tex_file_writing",
+          "path": "utils.tex_file_writing",
+          "items": []
+        }
+      ]
+    }
+  ]
+}
