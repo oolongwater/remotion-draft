@@ -274,6 +274,9 @@ def remove_incompatible_methods(code: str) -> str:
         '.begin_ambient_camera_rotation',
         '.stop_ambient_camera_rotation',
         '.move_camera',
+        'self.check_overlap',  # Non-existent method
+        '.check_overlap',  # Non-existent method
+        '.bounding_box',  # Non-existent attribute (MathTex doesn't have this)
     ]
 
     for line in lines:
@@ -282,7 +285,7 @@ def remove_incompatible_methods(code: str) -> str:
 
         for pattern in incompatible_patterns:
             if pattern in stripped_line:
-                print(f"⚠️  Removed incompatible method: {stripped_line}")
+                print(f"⚠️  Removed incompatible method/attribute: {stripped_line}")
                 skip_line = True
                 break
 
@@ -290,6 +293,48 @@ def remove_incompatible_methods(code: str) -> str:
             filtered_lines.append(line)
 
     return '\n'.join(filtered_lines)
+
+
+def remove_placeholders(code: str) -> str:
+    """
+    Remove code generation placeholders like {tts_init}, {variable_name}, etc.
+    
+    Args:
+        code: Python code string
+        
+    Returns:
+        Code with placeholders removed or replaced
+    """
+    # Pattern: {tts_init} or {variable_name} - replace with proper initialization
+    if '{tts_init}' in code:
+        print("⚠️  Found placeholder {tts_init}, replacing with ElevenLabsService initialization")
+        code = code.replace(
+            '{tts_init}',
+            'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)'
+        )
+    
+    # Pattern: Any other {placeholder} - remove the line or replace with comment
+    import re
+    placeholder_pattern = r'\{[a-zA-Z_][a-zA-Z0-9_]*\}'
+    matches = re.findall(placeholder_pattern, code)
+    if matches:
+        for placeholder in matches:
+            print(f"⚠️  Found placeholder {placeholder}, removing")
+            # Remove lines containing only the placeholder
+            lines = code.split('\n')
+            filtered_lines = []
+            for line in lines:
+                if placeholder in line and line.strip() == placeholder:
+                    # Skip lines that are just the placeholder
+                    continue
+                elif placeholder in line:
+                    # Replace placeholder in line with comment or remove
+                    filtered_lines.append(line.replace(placeholder, '# Placeholder removed'))
+                else:
+                    filtered_lines.append(line)
+            code = '\n'.join(filtered_lines)
+    
+    return code
 
 
 def fix_color_constants(code: str) -> str:
@@ -383,6 +428,7 @@ def apply_all_manual_fixes(code: str) -> str:
     print("🔧 Applying manual code fixes...")
 
     # Order matters!
+    code = remove_placeholders(code)  # Remove placeholders first
     code = remove_camera_orientation_calls(code)
     code = fix_scene_inheritance(code)
     code = ensure_voiceover_imports(code)

@@ -118,6 +118,31 @@ def render_single_scene_logic(
             # Print stdout/stderr for debugging if exit code is non-zero
             if result.returncode != 0:
                 print("   ⚠️  Non-zero exit code detected")
+                
+                # Detect specific error types
+                error_summary = []
+                if result.stderr:
+                    stderr_lower = result.stderr.lower()
+                    if 'eoferror' in stderr_lower or 'eof when reading a line' in stderr_lower:
+                        error_summary.append("EOFError: Interactive prompt failed (likely transcription package issue)")
+                    if 'nameerror' in stderr_lower:
+                        # Extract the undefined name
+                        name_match = __import__('re').search(r"name '(\w+)' is not defined", result.stderr)
+                        if name_match:
+                            error_summary.append(f"NameError: '{name_match.group(1)}' is not defined")
+                    if 'attributeerror' in stderr_lower:
+                        # Extract the attribute error
+                        attr_match = __import__('re').search(r"has no attribute '(\w+)'", result.stderr)
+                        if attr_match:
+                            error_summary.append(f"AttributeError: Missing attribute '{attr_match.group(1)}'")
+                    if 'tts_init' in stderr_lower or '{tts_init}' in current_code:
+                        error_summary.append("Code generation issue: Placeholder '{tts_init}' not replaced")
+                
+                if error_summary:
+                    print("   🔍 Detected errors:")
+                    for err in error_summary:
+                        print(f"      - {err}")
+                
                 if result.stdout:
                     stdout_preview = result.stdout[-1000:] if len(result.stdout) > 1000 else result.stdout
                     print(f"   📋 stdout (last 1000 chars):\n{stdout_preview}")
@@ -180,7 +205,26 @@ def render_single_scene_logic(
 
                 claude_service = AnthropicClaudeService(model="claude-sonnet-4-5-20250929")
 
-                repair_prompt = f"""The following Manim code failed to render. Please fix the code.
+                # Build enhanced repair prompt with error analysis
+                error_analysis = ""
+                if result.stderr:
+                    stderr_lower = result.stderr.lower()
+                    if 'eoferror' in stderr_lower:
+                        error_analysis += "\n\nCRITICAL: EOFError detected. This happens when manim-voiceover tries to prompt for missing packages. Ensure transcription_model=None is set and never call set_transcription()."
+                    if 'nameerror' in stderr_lower:
+                        name_match = __import__('re').search(r"name '(\w+)' is not defined", result.stderr)
+                        if name_match:
+                            undefined_name = name_match.group(1)
+                            error_analysis += f"\n\nCRITICAL: NameError - '{undefined_name}' is not defined. Check for placeholders like {{tts_init}} or {{variable_name}} that weren't replaced. Remove or replace all placeholders."
+                    if 'attributeerror' in stderr_lower:
+                        attr_match = __import__('re').search(r"has no attribute '(\w+)'", result.stderr)
+                        if attr_match:
+                            missing_attr = attr_match.group(1)
+                            error_analysis += f"\n\nCRITICAL: AttributeError - Missing attribute '{missing_attr}'. Remove calls to non-existent methods/attributes."
+                    if 'tts_init' in stderr_lower or '{tts_init}' in current_code:
+                        error_analysis += "\n\nCRITICAL: Found placeholder '{tts_init}' in code. Replace with actual ElevenLabsService initialization: ElevenLabsService(voice_id=\"pqHfZKP75CvOlQylNhV4\", transcription_model=None)"
+                
+                repair_prompt = f"""The following Manim code failed to render. Please fix ALL errors.
 
 ORIGINAL CODE:
 ```python
@@ -192,8 +236,16 @@ ERROR OUTPUT (stdout):
 
 ERROR OUTPUT (stderr):
 {result.stderr[:2000]}
+{error_analysis}
 
-Return ONLY the fixed Python code with ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)."""
+REQUIREMENTS:
+1. Use ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None) - NEVER use transcription_model or set_transcription()
+2. Remove ALL placeholders like {{tts_init}}, {{variable_name}}, etc.
+3. Remove calls to non-existent methods like check_overlap(), bounding_box, etc.
+4. Ensure all classes inherit from VoiceoverScene, not Scene
+5. Do NOT call set_transcription() anywhere
+
+Return ONLY the fixed Python code."""
 
                 repaired_code = claude_service.generate_simple(
                     prompt=repair_prompt,

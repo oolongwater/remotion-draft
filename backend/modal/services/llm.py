@@ -12,11 +12,23 @@ from services.llm.base import (
     LLMServiceError
 )
 from services.llm.anthropic import AnthropicClaudeService
+from services.llm.cerebras import CerebrasService
+from services.llm.factory import (
+    create_llm_service,
+    get_available_providers,
+    get_default_model,
+    SUPPORTED_PROVIDERS
+)
 
 __all__ = [
     'LLMMessage',
     'LLMResponse',
     'LLMService',
     'LLMServiceError',
-    'AnthropicClaudeService'
+    'AnthropicClaudeService',
+    'CerebrasService',
+    'create_llm_service',
+    'get_available_providers',
+    'get_default_model',
+    'SUPPORTED_PROVIDERS'
 ]

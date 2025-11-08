@@ -4,7 +4,8 @@ Anthropic Claude LLM service implementation
 
 import os
 from typing import List, Optional
-from .base import LLMService, LLMMessage, LLMResponse, LLMServiceError
+
+from .base import LLMMessage, LLMResponse, LLMService, LLMServiceError
 
 
 class AnthropicClaudeService(LLMService):
@@ -271,7 +272,7 @@ class AnthropicClaudeService(LLMService):
         """Validate Anthropic API key."""
         try:
             # Simple test call
-            test_response = self.client.messages.create(
+            self.client.messages.create(
                 model=self.model,
                 max_tokens=10,
                 messages=[{"role": "user", "content": "Hello"}]

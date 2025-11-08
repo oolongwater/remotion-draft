@@ -9,8 +9,8 @@ MAX_TOKENS = 16000
 # Rendering Configuration
 MAX_RENDER_ATTEMPTS = 2
 RENDER_TIMEOUT = 600  # seconds (10 minutes)
-RENDER_MEMORY = 8192  # MB (8GB)
-RENDER_CPU = 4.0
+RENDER_MEMORY = 16384  # MB (8GB)
+RENDER_CPU = 8.0
 
 # Main Pipeline Configuration
 MAIN_TIMEOUT = 3600  # seconds (1 hour)
@@ -25,11 +25,13 @@ VOLUME_NAME = "video-outputs-main-dev"
 RENDER_SECRETS = [
     "anthropic-key",  # For code repair
     "elevenlabs-key",  # For TTS
+    "cerebras-key",  # For Cerebras LLM
     "gcp-credentials",  # For GCS uploads (contains GCP_SERVICE_ACCOUNT_JSON)
 ]
 
 MAIN_SECRETS = [
     "anthropic-key",
     "elevenlabs-key",
+    "cerebras-key",  # For Cerebras LLM
     "gcp-credentials",  # For GCS uploads (contains GCP_SERVICE_ACCOUNT_JSON)
 ]

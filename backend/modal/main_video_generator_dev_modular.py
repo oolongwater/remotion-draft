@@ -69,10 +69,11 @@ image = (
         "requests>=2.31.0",
         "python-dotenv>=0.21.0",
         "manim==0.18.1",
-        "manim-voiceover>=0.3.0",
+        "manim-voiceover[transcribe]>=0.3.0",  # Include transcription extra to prevent EOFError prompts
         "elevenlabs==0.2.27",
         "fastapi[standard]>=0.104.0",
         "anthropic>=0.40.0",
+        "cerebras-cloud-sdk",
         "google-cloud-storage>=2.10.0",
     )
     # Add services directory as a Python package

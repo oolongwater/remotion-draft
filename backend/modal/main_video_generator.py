@@ -54,6 +54,7 @@ image = (
         "elevenlabs==0.2.27",  # TTS provider
         "fastapi[standard]>=0.104.0",
         "anthropic>=0.40.0",
+        "cerebras-cloud-sdk",
     )
     .add_local_file("../llm.py", "/root/llm.py")
     .add_local_file("../tts.py", "/root/tts.py")  # TTS service (ElevenLabs)

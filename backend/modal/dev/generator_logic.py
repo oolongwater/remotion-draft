@@ -69,12 +69,15 @@ def generate_educational_video_logic(
         capture_log(f"Starting video generation - Job: {job_id}, Topic: {prompt}")
 
         # Initialize LLM service
-        from services.llm import AnthropicClaudeService
+        from services.llm import create_llm_service
 
-        print("🔧 Initializing Claude Sonnet 4.5 service...")
-        claude_service = AnthropicClaudeService(model="claude-sonnet-4-5-20250929")
-        print("✓ Claude service initialized\n")
-        capture_log("Claude Sonnet 4.5 service initialized")
+        provider = "cerebras"
+        model = "qwen-3-235b-a22b-thinking-2507"
+
+        print(f"🔧 Initializing {provider} {model} service...")
+        llm_service = create_llm_service(provider=provider, model=model)
+        print(f"✓ {provider} {model} service initialized\n")
+        capture_log(f"{provider} {model} service initialized")
 
         # STAGE 1: Generate Mega Plan with Structured Output
         print(f"\n{'─'*60}")
@@ -91,67 +94,115 @@ def generate_educational_video_logic(
             "job_id": job_id
         })
 
-        # Call Claude Sonnet for plan generation
+        # Call Cerebras for plan generation
         plan_prompt = f"{MEGA_PLAN_PROMPT}\n\nTopic: {prompt}"
 
         # Add image context if provided
         if image_context:
             plan_prompt += "\n\nIMPORTANT: An image has been provided as visual context. Reference this image when planning the video structure and visual approach. Use the image to inform what concepts to explain and how to visualize them."
             print(f"🖼️  Image context provided - will be included in plan generation")
+            print(f"⚠️  Note: Cerebras may not support multimodal images. Image context will be described in text.")
 
-        print(f"🤖 Calling Claude Sonnet for plan generation...")
-        print(f"   Model: claude-sonnet-4-5-20250929")
+        print(f"🤖 Calling {provider} {model} for plan generation...")
+        print(f"   Model: {model}")
         print(f"   Temperature: {TEMP}")
         print(f"   Max tokens: {MAX_TOKENS}")
 
-        # Call with image if provided
-        if image_context:
-            # Use the LLM service's underlying client to send multimodal message
-            from anthropic import Anthropic
-            anthropic_client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY') or os.getenv('anthropic_key'))
-
-            response = anthropic_client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=MAX_TOKENS,
-                temperature=TEMP,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": image_context
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": plan_prompt
-                        }
-                    ]
-                }]
-            )
-            plan_response = response.content[0].text
-        else:
-            plan_response = claude_service.generate_simple(
-                prompt=plan_prompt,
-                max_tokens=MAX_TOKENS,
-                temperature=TEMP
-            )
+        # Note: Cerebras may not support multimodal images like Anthropic
+        # For now, we'll use text-only generation even when image_context is provided
+        plan_response = llm_service.generate_simple(
+            prompt=plan_prompt,
+            max_tokens=MAX_TOKENS,
+            temperature=TEMP
+        )
 
         # Parse the JSON plan
         print("\n🔍 Parsing plan response...")
         plan_text = plan_response
-        print(f"   Raw response preview: {plan_text[:200]}...")
+        print(f"   Raw response type: {type(plan_text)}")
+        print(f"   Raw response length: {len(plan_text) if plan_text else 0}")
+        print(f"   Raw response preview (first 500 chars): {plan_text[:500] if plan_text else 'None'}...")
+        print(f"   Raw response preview (last 500 chars): ...{plan_text[-500:] if plan_text and len(plan_text) > 500 else plan_text}")
+        
+        original_plan_text = plan_text
+        
+        # Handle Cerebras thinking model responses that include reasoning
+        # Look for </think> marker or similar
+        if '</think>' in plan_text:
+            print(f"   Found </think> marker, extracting JSON after reasoning...")
+            plan_text = plan_text.split('</think>')[-1].strip()
+            print(f"   Extracted text length after reasoning: {len(plan_text)}")
+            print(f"   Extracted text preview: {plan_text[:300]}...")
+        
+        # Debug: Check for markdown code blocks
+        has_json_block = '```json' in plan_text
+        has_code_block = '```' in plan_text
+        print(f"   Contains ```json block: {has_json_block}")
+        print(f"   Contains ``` block: {has_code_block}")
+        
         # Remove markdown code blocks if present
         if '```json' in plan_text:
+            print(f"   Extracting JSON from ```json block...")
             plan_text = plan_text.split('```json')[1].split('```')[0].strip()
+            print(f"   Extracted text length: {len(plan_text)}")
+            print(f"   Extracted text preview: {plan_text[:300]}...")
         elif '```' in plan_text:
+            print(f"   Extracting JSON from ``` block...")
             plan_text = plan_text.split('```')[1].split('```')[0].strip()
+            print(f"   Extracted text length: {len(plan_text)}")
+            print(f"   Extracted text preview: {plan_text[:300]}...")
+        
+        # Try to find JSON object in the text (look for first { and last })
+        # This handles cases where there's text before/after the JSON
+        if not plan_text.strip().startswith('{'):
+            print(f"   Text doesn't start with {{, searching for JSON object...")
+            # Find first {
+            first_brace = plan_text.find('{')
+            if first_brace != -1:
+                # Find matching closing brace
+                brace_count = 0
+                last_brace = -1
+                for i in range(first_brace, len(plan_text)):
+                    if plan_text[i] == '{':
+                        brace_count += 1
+                    elif plan_text[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            last_brace = i
+                            break
+                
+                if last_brace != -1:
+                    plan_text = plan_text[first_brace:last_brace + 1]
+                    print(f"   Extracted JSON object (from char {first_brace} to {last_brace + 1})")
+                    print(f"   Extracted text length: {len(plan_text)}")
+                    print(f"   Extracted text preview: {plan_text[:300]}...")
+                else:
+                    print(f"   ⚠️  Found opening {{ but couldn't find matching }}")
 
-        mega_plan = json.loads(plan_text)
-        print(f"✓ Plan parsed successfully")
+        # Debug: Try to find JSON-like content
+        print(f"\n🔍 [DEBUG] Attempting JSON parse...")
+        print(f"   Text to parse length: {len(plan_text)}")
+        print(f"   Text to parse (first 500 chars): {plan_text[:500]}")
+        print(f"   Text to parse (last 500 chars): {plan_text[-500:] if len(plan_text) > 500 else plan_text}")
+        
+        try:
+            mega_plan = json.loads(plan_text)
+            print(f"✓ Plan parsed successfully")
+            print(f"   Parsed keys: {list(mega_plan.keys()) if isinstance(mega_plan, dict) else 'Not a dict'}")
+        except json.JSONDecodeError as e:
+            print(f"\n❌ JSON parsing failed!")
+            print(f"   Error: {e}")
+            print(f"   Error position: line {e.lineno}, column {e.colno}")
+            print(f"   Error message: {e.msg}")
+            print(f"\n📋 Full response that failed to parse:")
+            print(f"{'='*80}")
+            print(plan_text)
+            print(f"{'='*80}")
+            print(f"\n📋 Original response (before extraction):")
+            print(f"{'='*80}")
+            print(original_plan_text[:2000])
+            print(f"{'='*80}")
+            raise
 
         # Extract video structure from mega plan
         video_structure = mega_plan.get('video_structure', [])
@@ -214,56 +265,45 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 if image_context:
                     section_prompt += "\n\nNOTE: An image was provided as context for this video. When creating visual demonstrations, consider referencing elements or concepts visible in that image."
 
-                print(f"🤖 [Async {section_num}] Calling Claude Sonnet for code generation (async)...")
-                print(f"   Model: claude-sonnet-4-5-20250929")
+                print(f"🤖 [Async {section_num}] Calling {provider} {model} for code generation (async)...")
+                print(f"   Model: {model}")
                 print(f"   Temperature: {TEMP}")
                 print(f"   Max tokens: {MAX_TOKENS}")
                 if image_context:
-                    print(f"   🖼️  Using image context")
+                    print(f"   🖼️  Image context provided (will be described in text)")
+                    print(f"   ⚠️  Note: Cerebras may not support multimodal images")
 
-                # Async API call - with image if provided
-                if image_context:
-                    # Use direct Anthropic API for multimodal
-                    from anthropic import AsyncAnthropic
-                    async_anthropic = AsyncAnthropic(api_key=os.getenv('ANTHROPIC_API_KEY') or os.getenv('anthropic_key'))
-
-                    response = await async_anthropic.messages.create(
-                        model="claude-sonnet-4-5-20250929",
-                        max_tokens=MAX_TOKENS,
-                        temperature=TEMP,
-                        messages=[{
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image",
-                                    "source": {
-                                        "type": "base64",
-                                        "media_type": "image/png",
-                                        "data": image_context
-                                    }
-                                },
-                                {
-                                    "type": "text",
-                                    "text": section_prompt
-                                }
-                            ]
-                        }]
-                    )
-                    manim_code = response.content[0].text
-                else:
-                    # Text-only API call using llm.py service - ALL happen in parallel!
-                    manim_code = await claude_service.generate_simple_async(
-                        prompt=section_prompt,
-                        max_tokens=MAX_TOKENS,
-                        temperature=TEMP
-                    )
+                # Note: Cerebras may not support multimodal images like Anthropic
+                # For now, we'll use text-only generation even when image_context is provided
+                # Text-only API call using llm service - ALL happen in parallel!
+                manim_code = await llm_service.generate_simple_async(
+                    prompt=section_prompt,
+                    max_tokens=MAX_TOKENS,
+                    temperature=TEMP
+                )
 
                 print(f"\n🔍 [Async {section_num}] Extracting code from response...")
-                print(f"   Raw response preview: {manim_code[:200]}...")
+                print(f"   Raw response type: {type(manim_code)}")
+                print(f"   Raw response length: {len(manim_code) if manim_code else 0}")
+                print(f"   Raw response preview (first 500 chars): {manim_code[:500] if manim_code else 'None'}...")
+                
+                # Debug: Check for code blocks
+                has_python_block = '```python' in manim_code
+                has_code_block = '```' in manim_code
+                print(f"   Contains ```python block: {has_python_block}")
+                print(f"   Contains ``` block: {has_code_block}")
+                
+                original_code = manim_code
                 if '```python' in manim_code:
+                    print(f"   Extracting code from ```python block...")
                     manim_code = manim_code.split('```python')[1].split('```')[0].strip()
+                    print(f"   Extracted code length: {len(manim_code)}")
                 elif '```' in manim_code:
+                    print(f"   Extracting code from ``` block...")
                     manim_code = manim_code.split('```')[1].split('```')[0].strip()
+                    print(f"   Extracted code length: {len(manim_code)}")
+                else:
+                    print(f"   No code blocks found, using raw response")
 
                 # Clean the code to remove problematic parameters
                 from services.code_utils import apply_all_manual_fixes, clean_manim_code
