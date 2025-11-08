@@ -102,6 +102,12 @@ MANIM_META_PROMPT = """You are an expert Manim animator creating educational exp
 9. **Before Adding ANY Element**: Mentally check if it will overlap with existing elements - if yes, adjust position or remove old elements first
 10. **Consistent Alignment**: All text in a group should align (use VGroup and .arrange(DOWN, buff=0.5) for vertical stacks)
 
+## Naming Convention:
+- Use descriptive, educational variable names that match what students would recognize
+- Good: `chloroplast`, `mitochondria`, `dna_helix`, `proton`, `electron_shell`
+- Bad: `green_blob`, `particle_1`, `obj`, `temp_circle`
+- Variable names are used by the interactive segmentation system to identify objects
+
 ## Code Template Structure:
 ```python
 from manim import *
@@ -123,11 +129,12 @@ class ExplainerScene(Scene):
             self.add(obj)
             return obj
 
-        # Title/Introduction with proper spacing
+        # Title with proper spacing
         title = Text("Concept Name", font_size=48)
         title.to_edge(UP, buff=0.5)  # Always specify buff for consistent spacing
         add_with_spatial_check(title, "title")
 
+        # Subtitle
         subtitle = Text("Brief description", font_size=24)
         subtitle.next_to(title, DOWN, buff=0.4)  # Explicit spacing
         add_with_spatial_check(subtitle, "subtitle")

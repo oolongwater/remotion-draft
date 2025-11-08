@@ -319,7 +319,7 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
 
                 print(f"✓ [Async {section_num}] Render container spawned! Continuing to next section...")
 
-                return (section_num, True, None)
+                return (section_num, True, manim_code, None)
 
             except Exception as e:
                 print(f"\n❌ [Async {section_num}] Code generation error: {type(e).__name__}: {e}")
@@ -338,6 +338,15 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
         generation_results = asyncio.run(generate_all_parallel())
 
         print(f"\n✓ Code generation complete: {len([r for r in generation_results if r[1]])} / {len(video_structure)} sections spawned renders")
+        
+        # Store Manim code for each successfully generated section
+        section_manim_codes = {}
+        for result in generation_results:
+            if isinstance(result, tuple) and len(result) >= 4:
+                section_num, success, manim_code, error = result
+                if success and manim_code:
+                    section_manim_codes[section_num] = manim_code
+                    print(f"   Stored Manim code for section {section_num} ({len(manim_code)} chars)")
 
         # Now wait for all render containers to complete (in parallel)
         print(f"\n{'─'*60}")
@@ -394,11 +403,20 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
         scene_videos.sort(key=lambda x: x[0])
         scene_videos = [video for _, video in scene_videos]
         
-        # Build list of section URLs (sections are uploaded to GCS at {job_id}/section_{num}.mp4)
+        # Build list of section data (URLs + Manim code)
         section_urls = []
+        sections_with_code = []
         for section_num in sorted(successful_sections):
             section_url = f"https://storage.googleapis.com/vid-gen-static/{job_id}/section_{section_num}.mp4"
             section_urls.append(section_url)
+            
+            # Include Manim code if available
+            manim_code = section_manim_codes.get(section_num, '')
+            sections_with_code.append({
+                'url': section_url,
+                'section_num': section_num,
+                'manim_code': manim_code
+            })
 
         print(f"\n✓ Rendering complete: {len(scene_videos)} / {len(video_structure)} sections succeeded")
 
@@ -534,7 +552,8 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
             "message": "Video generation completed successfully!",
             "video_path": str(final_video),
             "job_id": job_id,
-            "sections": section_urls,  # List of section video URLs
+            "sections": section_urls,  # List of section video URLs (backward compatible)
+            "sections_with_code": sections_with_code,  # NEW: Section data with Manim code
             "metadata": {
                 "prompt": prompt,
                 "file_size_mb": round(final_size, 2),

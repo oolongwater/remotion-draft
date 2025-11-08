@@ -173,24 +173,26 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       });
       
       if (result.success && result.sections && result.sections.length > 0) {
-        // Map section URLs to VideoSegments
-        const segments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
-          // Extract section number from URL (e.g., section_1.mp4 -> 1)
-          const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
-          const sectionNum = sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1;
-          
+        // Map section data to VideoSegments - use sections_with_code if available, otherwise fall back to sections
+        const sections_with_code = result.sections_with_code || result.sections.map((url, index) => ({
+          url,
+          section_num: index + 1,
+          manim_code: ''
+        }));
+        
+        const segments: VideoSegment[] = sections_with_code.map((section, index) => {
           return {
-            id: `segment_${sectionNum}`,
-            manimCode: '', // Not needed since video is already rendered
+            id: `segment_${section.section_num}`,
+            manimCode: section.manim_code, // NOW INCLUDES ACTUAL MANIM CODE!
             duration: 90, // Default duration (could be improved with metadata)
-            hasQuestion: index < result.sections!.length - 1, // All but last have questions
-            questionText: index < result.sections!.length - 1 
+            hasQuestion: index < sections_with_code.length - 1, // All but last have questions
+            questionText: index < sections_with_code.length - 1 
               ? 'What did you learn from this section?' 
               : undefined,
             topic: topic,
             difficulty: 'medium',
             generatedAt: new Date().toISOString(),
-            videoUrl: sectionUrl,
+            videoUrl: section.url,
             renderingStatus: 'completed', // Already rendered
           };
         });

@@ -13,6 +13,9 @@ import { InputOverlay } from "./components/InputOverlay";
 import { LandingPage } from "./components/LandingPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorDisplay } from "./components/ErrorDisplay";
+import { SegmentationOverlay, SegmentationLoading } from "./components/SegmentationOverlay";
+import { handleVideoSegmentation, SegmentationMask } from "./services/segmentationService";
+import { getLabelFromManimCode } from "./utils/manimCodeParser";
 
 /**
  * App state types
@@ -33,6 +36,14 @@ export const App: React.FC = () => {
   
   // Track when segment changes to restart playback
   const [segmentKey, setSegmentKey] = useState(0);
+  
+  // Segmentation state (always enabled)
+  const [segmentationMasks, setSegmentationMasks] = useState<SegmentationMask[] | null>(null);
+  const [segmentationLabel, setSegmentationLabel] = useState<string | undefined>(undefined);
+  const [isSegmenting, setIsSegmenting] = useState(false);
+  const [videoDisplaySize, setVideoDisplaySize] = useState({ width: 0, height: 0 });
+  const [videoActualSize, setVideoActualSize] = useState({ width: 0, height: 0 });
+  const [currentManimCode, setCurrentManimCode] = useState<string>('');
   
   // ===== TEST MODE - EASILY REMOVABLE =====
   const [isTestMode, setIsTestMode] = useState(false);
@@ -88,6 +99,207 @@ export const App: React.FC = () => {
     setCurrentTopic('');
     setError('');
     setIsTestMode(false); // Reset test mode
+    setSegmentationMasks(null);
+  };
+  
+  /**
+   * Check if clicked area is mostly black background
+   */
+  const isBlackBackground = (video: HTMLVideoElement, x: number, y: number): boolean => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      
+      // Sample a small area around the click point
+      const sampleSize = 20;
+      canvas.width = sampleSize;
+      canvas.height = sampleSize;
+      
+      // Calculate sampling position
+      const rect = video.getBoundingClientRect();
+      const videoX = ((x - rect.left) / rect.width) * video.videoWidth;
+      const videoY = ((y - rect.top) / rect.height) * video.videoHeight;
+      
+      // Draw the sample area
+      ctx.drawImage(
+        video,
+        videoX - sampleSize / 2,
+        videoY - sampleSize / 2,
+        sampleSize,
+        sampleSize,
+        0,
+        0,
+        sampleSize,
+        sampleSize
+      );
+      
+      // Get pixel data
+      const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+      const data = imageData.data;
+      
+      // Calculate average brightness
+      let totalBrightness = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        totalBrightness += (r + g + b) / 3;
+      }
+      const avgBrightness = totalBrightness / (sampleSize * sampleSize);
+      
+      // Consider it black if average brightness is less than 15 (out of 255)
+      return avgBrightness < 15;
+    } catch (error) {
+      console.log('Could not check background color:', error);
+      return false;
+    }
+  };
+  
+  /**
+   * Handle video container click for segmentation
+   * Always triggers segmentation (mode always enabled)
+   */
+  const handleVideoContainerClick = async (event: React.MouseEvent<HTMLDivElement>) => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    // Check if clicked on black background - clear segmentation if active
+    if (isBlackBackground(video, event.clientX, event.clientY)) {
+      console.log('⚫ Clicked on black background');
+      if (segmentationMasks) {
+        console.log('   Clearing segmentation');
+        setSegmentationMasks(null);
+        setSegmentationLabel(undefined);
+      }
+      return;
+    }
+    
+    // Update display size right before segmentation
+    const rect = video.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setVideoDisplaySize({
+        width: rect.width,
+        height: rect.height,
+      });
+      console.log('📐 Pre-segmentation video display size:', rect.width, 'x', rect.height);
+    }
+    
+    // Clear previous segmentation
+    setSegmentationMasks(null);
+    setIsSegmenting(true);
+    
+    try {
+      // Perform segmentation
+      const result = await handleVideoSegmentation(event, video);
+      
+      if (result && result.success && result.masks) {
+        setSegmentationMasks(result.masks);
+        
+        // Store video dimensions for overlay
+        if (result.image_size) {
+          setVideoActualSize({
+            width: result.image_size.width,
+            height: result.image_size.height,
+          });
+          console.log('📐 Video actual size from API:', result.image_size.width, 'x', result.image_size.height);
+        }
+        
+        // Get contextual label from Manim code metadata
+        const currentTime = video.currentTime;
+        const rect = video.getBoundingClientRect();
+        
+        // Get normalized click coordinates
+        const normalizedX = (event.clientX - rect.left) / rect.width;
+        const normalizedY = (event.clientY - rect.top) / rect.height;
+        
+        // Try to get label from Manim code first (most accurate)
+        let label = getLabelFromManimCode(
+          currentManimCode,
+          normalizedX,
+          normalizedY,
+          currentTime
+        );
+        
+        if (label) {
+          console.log('🏷️  Object label from Manim code:', label);
+        }
+        
+        // Fallback to keyword-based if Manim parsing fails
+        if (!label && currentTopic) {
+          label = getContextualLabel(currentTopic, currentTime);
+          if (label) {
+            console.log('🏷️  Object label from keyword fallback:', label);
+          }
+        }
+        
+        if (!label) {
+          console.log('⚠️  No label found for this object');
+        }
+        
+        setSegmentationLabel(label);
+      } else {
+        console.error('Segmentation failed:', result?.error);
+      }
+    } catch (error) {
+      console.error('Error in video segmentation:', error);
+    } finally {
+      setIsSegmenting(false);
+    }
+  };
+  
+  /**
+   * Extract potential object labels from video context and timestamp
+   * Uses topic, segment content, and current timestamp to guess what object was clicked
+   */
+  const getContextualLabel = (topic: string, currentTime: number): string | undefined => {
+    if (!topic) return undefined;
+    
+    // Common educational topics and their associated objects
+    const topicKeywords: Record<string, string[]> = {
+      // Biology
+      'cell': ['nucleus', 'mitochondria', 'chloroplast', 'ribosome', 'cell membrane', 'cytoplasm', 'endoplasmic reticulum', 'golgi apparatus'],
+      'photosynthesis': ['chloroplast', 'thylakoid', 'stroma', 'chlorophyll', 'carbon dioxide', 'glucose', 'oxygen'],
+      'respiration': ['mitochondria', 'ATP', 'glucose', 'oxygen', 'carbon dioxide'],
+      'dna': ['nucleotide', 'base pair', 'helix', 'adenine', 'thymine', 'guanine', 'cytosine', 'sugar', 'phosphate'],
+      'protein': ['amino acid', 'ribosome', 'peptide bond', 'enzyme', 'protein structure'],
+      
+      // Chemistry
+      'atom': ['proton', 'neutron', 'electron', 'nucleus', 'electron shell', 'orbital'],
+      'molecule': ['atom', 'bond', 'oxygen', 'hydrogen', 'carbon', 'nitrogen'],
+      'reaction': ['reactant', 'product', 'catalyst', 'energy', 'activation energy'],
+      
+      // Physics
+      'circuit': ['resistor', 'capacitor', 'battery', 'wire', 'current', 'voltage'],
+      'wave': ['wavelength', 'amplitude', 'frequency', 'crest', 'trough'],
+      'force': ['mass', 'acceleration', 'velocity', 'momentum', 'energy'],
+      
+      // Math
+      'graph': ['axis', 'point', 'line', 'curve', 'vertex', 'edge'],
+      'triangle': ['vertex', 'side', 'angle', 'hypotenuse', 'base', 'height'],
+      'circle': ['radius', 'diameter', 'circumference', 'center', 'arc', 'chord'],
+    };
+    
+    const topicLower = topic.toLowerCase();
+    
+    // Find matching keywords
+    let candidates: string[] = [];
+    for (const [key, objects] of Object.entries(topicKeywords)) {
+      if (topicLower.includes(key)) {
+        candidates.push(...objects);
+      }
+    }
+    
+    // If we have candidates, return a semi-random one based on timestamp
+    // This creates pseudo-consistent labeling (same timestamp = same label)
+    if (candidates.length > 0) {
+      const index = Math.floor(currentTime * 1.5) % candidates.length;
+      const label = candidates[index];
+      console.log(`🏷️ Context label: "${label}" (from topic: "${topic}", time: ${currentTime.toFixed(1)}s)`);
+      return label.charAt(0).toUpperCase() + label.slice(1); // Capitalize
+    }
+    
+    return undefined;
   };
 
   // Render based on app state
@@ -137,11 +349,72 @@ export const App: React.FC = () => {
             // Effect to restart video when segment changes
             useEffect(() => {
               if (currentSegment && currentSegment.videoUrl && videoRef.current) {
+                console.log('🎬 Segment changed, loading new segment data...');
+                console.log('   Segment ID:', currentSegment.id);
+                console.log('   Has manimCode:', !!currentSegment.manimCode);
+                console.log('   Has topic:', !!currentSegment.topic);
+                
                 setSegmentKey((prev) => prev + 1);
                 videoRef.current.load();
                 videoRef.current.play().catch(console.error);
+                
+                // Update current Manim code for precise object identification
+                const manimCode = currentSegment.manimCode || '';
+                const topic = currentSegment.topic || '';
+                setCurrentManimCode(manimCode);
+                setCurrentTopic(topic);
+                console.log('📝 Loaded segment code:');
+                console.log('   Manim code length:', manimCode.length, 'chars');
+                console.log('   Topic:', topic);
+                if (manimCode.length > 0) {
+                  console.log('   Code preview:', manimCode.substring(0, 200) + '...');
+                } else {
+                  console.warn('   ⚠️  WARNING: Manim code is empty!');
+                }
+                
+                // Clear segmentation when segment changes
+                setSegmentationMasks(null);
+                setSegmentationLabel(undefined);
               }
             }, [currentSegment?.id, currentSegment?.videoUrl]);
+            
+            // Effect to track video display size for segmentation overlay
+            useEffect(() => {
+              const video = videoRef.current;
+              if (!video) return;
+              
+              const updateVideoSize = () => {
+                const rect = video.getBoundingClientRect();
+                console.log('📐 Updating video size from rect:', rect);
+                
+                // Only update if we have valid dimensions
+                if (rect.width > 0 && rect.height > 0) {
+                  setVideoDisplaySize({
+                    width: rect.width,
+                    height: rect.height,
+                  });
+                  console.log('✓ Video display size set to:', rect.width, 'x', rect.height);
+                } else {
+                  console.log('⚠️ Video rect has 0 dimensions, will retry...');
+                }
+              };
+              
+              // Update on load and resize
+              video.addEventListener('loadedmetadata', updateVideoSize);
+              video.addEventListener('loadeddata', updateVideoSize);
+              window.addEventListener('resize', updateVideoSize);
+              
+              // Try multiple times to catch when video is actually rendered
+              updateVideoSize(); // Immediate
+              setTimeout(updateVideoSize, 100); // After 100ms
+              setTimeout(updateVideoSize, 500); // After 500ms
+              
+              return () => {
+                video.removeEventListener('loadedmetadata', updateVideoSize);
+                video.removeEventListener('loadeddata', updateVideoSize);
+                window.removeEventListener('resize', updateVideoSize);
+              };
+            }, [currentSegment?.videoUrl]);
             
             // Check if video has ended and should auto-advance
             useEffect(() => {
@@ -227,23 +500,54 @@ export const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* Video Player Container */}
-                <div className="relative shadow-2xl rounded-lg overflow-hidden bg-black" style={{ width: "90vw", maxWidth: "1280px" }}>
+                {/* Segmentation hint */}
+                {!segmentationMasks && !isSegmenting && (
+                  <div className="absolute top-20 right-4 bg-blue-500/20 border border-blue-400/50 text-blue-200 px-3 py-2 rounded-lg text-xs backdrop-blur-sm z-40">
+                    🎯 Click video to segment objects
+                  </div>
+                )}
+
+                {/* Video Player Container - Click to segment (always enabled) */}
+                <div 
+                  className="relative shadow-2xl rounded-lg overflow-hidden bg-black cursor-crosshair" 
+                  style={{ width: "90vw", maxWidth: "1280px" }}
+                  onClick={handleVideoContainerClick}
+                  title="Click on the video to segment objects"
+                >
+                  
                   {currentSegment.videoUrl ? (
-                    <video
-                      key={segmentKey}
-                      ref={videoRef}
-                      src={currentSegment.videoUrl}
-                      controls
-                      autoPlay
-                      loop={currentSegment.hasQuestion}
-                      className="w-full h-auto"
-                      style={{
-                        maxHeight: "80vh",
-                      }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
+                    <>
+                      <video
+                        key={segmentKey}
+                        ref={videoRef}
+                        src={currentSegment.videoUrl}
+                        controls
+                        autoPlay
+                        loop={currentSegment.hasQuestion}
+                        crossOrigin="anonymous"
+                        className="w-full h-auto"
+                        style={{
+                          maxHeight: "80vh",
+                        }}
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                      
+                      {/* Segmentation loading indicator */}
+                      {isSegmenting && <SegmentationLoading />}
+                      
+                      {/* Segmentation overlay */}
+                      {segmentationMasks && segmentationMasks.length > 0 && (
+                        <SegmentationOverlay
+                          masks={segmentationMasks}
+                          videoWidth={videoActualSize.width}
+                          videoHeight={videoActualSize.height}
+                          displayWidth={videoDisplaySize.width}
+                          displayHeight={videoDisplaySize.height}
+                          objectLabel={segmentationLabel}
+                        />
+                      )}
+                    </>
                   ) : currentSegment.renderingStatus === 'rendering' || currentSegment.renderingStatus === 'pending' ? (
                     <div className="flex items-center justify-center" style={{ width: "100%", height: "450px" }}>
                       <div className="text-center text-white">

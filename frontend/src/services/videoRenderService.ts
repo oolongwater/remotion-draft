@@ -8,6 +8,15 @@
 import { VideoSegment } from "../types/VideoConfig";
 
 /**
+ * Section data with Manim code
+ */
+export interface SectionWithCode {
+  url: string;
+  section_num: number;
+  manim_code: string;
+}
+
+/**
  * Progress update from the backend
  */
 export interface GenerationProgress {
@@ -17,7 +26,8 @@ export interface GenerationProgress {
   progress_percentage?: number;
   message?: string;
   job_id?: string;
-  sections?: string[]; // List of section video URLs (only in completion)
+  sections?: string[]; // List of section video URLs (only in completion, backward compatible)
+  sections_with_code?: SectionWithCode[]; // NEW: Section data with Manim code
   error?: string;
   metadata?: {
     prompt?: string;
@@ -35,6 +45,7 @@ export async function generateVideoScenes(
 ): Promise<{
   success: boolean;
   sections?: string[];
+  sections_with_code?: SectionWithCode[];
   error?: string;
   jobId?: string;
 }> {
@@ -75,6 +86,7 @@ export async function generateVideoScenes(
 
     let buffer = "";
     let finalSections: string[] | undefined;
+    let finalSectionsWithCode: SectionWithCode[] | undefined;
     let jobId: string | undefined;
     let finalStatus: "processing" | "completed" | "failed" = "processing";
     let finalError: string | undefined;
@@ -104,6 +116,7 @@ export async function generateVideoScenes(
 
             if (data.status === "completed" && data.sections) {
               finalSections = data.sections;
+              finalSectionsWithCode = data.sections_with_code;
               finalStatus = "completed";
             } else if (data.status === "failed") {
               finalStatus = "failed";
@@ -127,6 +140,7 @@ export async function generateVideoScenes(
           const data = JSON.parse(line.slice(6)) as GenerationProgress;
           if (data.status === "completed" && data.sections) {
             finalSections = data.sections;
+            finalSectionsWithCode = data.sections_with_code;
             finalStatus = "completed";
           }
           onProgress?.(data);
@@ -140,6 +154,7 @@ export async function generateVideoScenes(
       return {
         success: true,
         sections: finalSections,
+        sections_with_code: finalSectionsWithCode,
         jobId,
       };
     } else if (finalStatus === "failed") {

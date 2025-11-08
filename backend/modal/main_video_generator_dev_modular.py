@@ -78,12 +78,12 @@ image = (
     )
     # Add services directory as a Python package
     .add_local_dir(
-        "backend/modal/services",
+        "services",
         "/root/services"
     )
     # Add dev module as a Python package
     .add_local_dir(
-        "backend/modal/dev",
+        "dev",
         "/root/dev",
         ignore=["image.py", "generator.py", "api.py", "cli.py"]
     )
