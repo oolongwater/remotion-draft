@@ -365,6 +365,7 @@ export const App: React.FC = () => {
             showQuiz,
             quizQuestion,
             quizResult,
+            quizExplanation,
             isGeneratingQuiz,
             isEvaluating,
             handleQuizAnswer,
@@ -553,6 +554,7 @@ export const App: React.FC = () => {
                   isEvaluating={isEvaluating}
                   error={videoError || undefined}
                   result={quizResult}
+                  explanation={quizExplanation || undefined}
                   onSubmitAnswer={handleQuizAnswer}
                   onContinue={closeQuiz}
                   onRestart={handleReset}

@@ -52,6 +52,18 @@ const TreeNode = ({ data }: NodeProps) => {
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
       
+      {/* Yellow ring for question nodes - unclickable and always visible */}
+      {data.isQuestionNode && (
+        <div 
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            border: '3px solid #fbbf24',
+            boxShadow: '0 0 20px rgba(251, 191, 36, 0.9), inset 0 0 10px rgba(251, 191, 36, 0.3)',
+            transform: 'scale(1.3)',
+          }}
+        />
+      )}
+      
       {/* Show tiny thumbnail if available */}
       {hasThumbnail && (
         <div className="absolute inset-0 rounded-full overflow-hidden">
@@ -202,6 +214,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             nodeNumber: nodeNumber,
             title: node.segment.title,
             thumbnailUrl: node.segment.thumbnailUrl,
+            isQuestionNode: isQuestionNode,
           },
           position: { x: xPosition, y: yPos },
           style: {

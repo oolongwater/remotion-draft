@@ -56,6 +56,20 @@ const ExplorerNode = ({ data }: NodeProps) => {
 
       {/* Node display - either thumbnail or circle */}
       <div className="relative">
+        {/* Yellow ring for question nodes - unclickable and always visible */}
+        {(data as any).isQuestionNode && (
+          <div 
+            className="absolute pointer-events-none rounded-lg"
+            style={{
+              inset: '-8px',
+              border: '4px solid #fbbf24',
+              boxShadow: '0 0 25px rgba(251, 191, 36, 0.95), inset 0 0 15px rgba(251, 191, 36, 0.3)',
+              borderRadius: hasThumbnail ? '12px' : '50%',
+              zIndex: 10,
+            }}
+          />
+        )}
+        
         {hasThumbnail ? (
           // Thumbnail image with node number overlay
           <div

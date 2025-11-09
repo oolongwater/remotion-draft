@@ -30,3 +30,6 @@ out
 .env
 .env.local
 
+# Python virtual environment
+venv/
+

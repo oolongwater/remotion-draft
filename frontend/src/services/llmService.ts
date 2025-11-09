@@ -211,9 +211,17 @@ export async function evaluateAnswer(
       evalData = JSON.parse(cleanedJSON);
     } catch (parseError) {
       console.error('Evaluation Parse Error:', parseError);
+      console.error('Raw response:', textContent);
+      console.error('Cleaned JSON:', cleanedJSON);
+      
+      // Return a more helpful error with snippet
+      const snippet = textContent.length > 100 
+        ? textContent.substring(0, 100) + '...' 
+        : textContent;
+      
       return {
         success: false,
-        error: 'Failed to parse evaluation response',
+        error: `Failed to parse evaluation response. Check console for details. Response started with: "${snippet}"`,
       };
     }
     
@@ -419,13 +427,26 @@ Determine:
 3. What topic should come next (deeper, easier, or related)?
 4. Suggested difficulty for next segment
 
-Response format (JSON only):
+CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after. No markdown formatting. Just the JSON object.
+
+RESPONSE FORMAT:
 {
-  "correct": true/false,
+  "correct": true,
   "reasoning": "Brief explanation",
   "suggestedNextTopic": "topic name",
-  "suggestedDifficulty": "easy/medium/hard"
-}`;
+  "suggestedDifficulty": "easy"
+}
+
+or
+
+{
+  "correct": false,
+  "reasoning": "Brief explanation",
+  "suggestedNextTopic": "topic name",
+  "suggestedDifficulty": "medium"
+}
+
+Return ONLY the JSON object now:`;
 }
 
 /**
@@ -461,20 +482,28 @@ function validateSegmentData(data: any): boolean {
 }
 
 /**
- * Clean JSON from LLM response
+ * Clean JSON from LLM response with aggressive extraction
  */
 function cleanJSONResponse(response: string): string {
   let cleaned = response.trim();
   
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.slice(7);
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.slice(3);
+  // Remove markdown code blocks
+  cleaned = cleaned.replace(/^```json\s*/i, '');
+  cleaned = cleaned.replace(/^```\s*/, '');
+  cleaned = cleaned.replace(/\s*```$/g, '');
+  
+  cleaned = cleaned.trim();
+  
+  // Try to extract JSON object - find first { to last }
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
   }
   
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.slice(0, -3);
-  }
+  // Remove any trailing text after the JSON object
+  cleaned = cleaned.replace(/\}\s*[^}]*$/g, '}');
   
   return cleaned.trim();
 }

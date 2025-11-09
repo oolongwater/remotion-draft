@@ -60,12 +60,19 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="bg-slate-800 rounded-xl shadow-2xl border border-slate-700 w-full max-w-2xl mx-4 overflow-hidden">
         
-        {/* Loading State */}
+        {/* Loading State - Minimal */}
         {status === 'loading' && (
-          <div className="p-12 text-center">
-            <LoadingSpinner />
-            <div className="mt-6 text-xl text-white">Generating your question...</div>
-            <div className="mt-2 text-sm text-slate-400">This will just take a moment</div>
+          <div className="p-16 flex items-center justify-center">
+            <div className="relative w-20 h-20">
+              {/* Outer spinning ring */}
+              <div className="absolute inset-0 border-4 border-transparent border-t-yellow-500 rounded-full animate-spin" />
+              
+              {/* Inner pulsing circle */}
+              <div className="absolute inset-4 bg-yellow-500/30 rounded-full animate-pulse" />
+              
+              {/* Center dot */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-yellow-500 rounded-full" />
+            </div>
           </div>
         )}
 
@@ -123,17 +130,19 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
           </div>
         )}
 
-        {/* Evaluating State */}
+        {/* Evaluating State - Minimal & Clean */}
         {status === 'evaluating' && (
-          <div className="p-12 text-center">
-            <div className="relative inline-block">
-              <LoadingSpinner />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-purple-500/30 rounded-full animate-ping"></div>
-              </div>
+          <div className="p-16 flex items-center justify-center">
+            <div className="relative w-20 h-20">
+              {/* Outer spinning ring */}
+              <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin" />
+              
+              {/* Inner pulsing circle */}
+              <div className="absolute inset-4 bg-purple-500/30 rounded-full animate-pulse" />
+              
+              {/* Center dot */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-purple-500 rounded-full" />
             </div>
-            <div className="mt-6 text-xl text-white">Evaluating your answer...</div>
-            <div className="mt-2 text-sm text-slate-400">Checking your understanding</div>
           </div>
         )}
 
@@ -160,23 +169,35 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
           </div>
         )}
 
-        {/* Incorrect State - Generating Remediation */}
+        {/* Incorrect State - Show Explanation */}
         {status === 'incorrect' && (
           <div className="p-12 text-center">
             <div className="text-6xl mb-6">💡</div>
             <h2 className="text-2xl font-bold text-orange-400 mb-4">Not quite right</h2>
-            <p className="text-lg text-white mb-4">
-              Let me help you understand this better
+            <p className="text-lg text-white mb-6">
+              Here's the correct explanation
             </p>
             {reasoning && (
-              <div className="mb-8 p-4 bg-orange-900/20 border border-orange-700/50 rounded-lg text-left">
-                <div className="text-sm font-semibold text-orange-400 mb-2">Feedback:</div>
-                <p className="text-sm text-slate-300">{reasoning}</p>
+              <div className="mb-8 p-6 bg-orange-900/20 border border-orange-700/50 rounded-lg text-left">
+                <div className="text-sm font-semibold text-orange-400 mb-3 uppercase tracking-wide">Explanation:</div>
+                <p className="text-base text-slate-200 leading-relaxed">{reasoning}</p>
               </div>
             )}
-            <div className="mt-6">
-              <LoadingSpinner />
-              <div className="mt-4 text-sm text-slate-400">Generating an explanation video for you...</div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={onContinue}
+                className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all text-lg"
+              >
+                Continue Learning →
+              </button>
+              {onStartOver && (
+                <button
+                  onClick={onStartOver}
+                  className="px-8 py-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all text-lg border border-slate-600"
+                >
+                  Start Over
+                </button>
+              )}
             </div>
           </div>
         )}
