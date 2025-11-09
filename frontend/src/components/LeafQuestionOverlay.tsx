@@ -63,18 +63,41 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="bg-slate-800 rounded-xl shadow-2xl border border-slate-700 w-full max-w-2xl mx-4 overflow-hidden">
         
-        {/* Loading State - Minimal */}
+        {/* Loading State - Enhanced */}
         {status === 'loading' && (
-          <div className="p-16 flex items-center justify-center">
-            <div className="relative w-20 h-20">
+          <div className="p-16 flex flex-col items-center justify-center relative overflow-hidden">
+            {/* Animated background orbs */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-1/3 left-1/3 w-32 h-32 bg-yellow-500/10 rounded-full blur-2xl animate-pulse" />
+              <div className="absolute bottom-1/3 right-1/3 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
+            </div>
+
+            {/* Enhanced spinner */}
+            <div className="relative w-24 h-24 mb-6 z-10">
               {/* Outer spinning ring */}
-              <div className="absolute inset-0 border-4 border-transparent border-t-yellow-500 rounded-full animate-spin" />
+              <div className="absolute inset-0 border-4 border-transparent border-t-yellow-500 border-r-yellow-400 rounded-full animate-spin" />
               
-              {/* Inner pulsing circle */}
-              <div className="absolute inset-4 bg-yellow-500/30 rounded-full animate-pulse" />
+              {/* Middle counter-spinning ring */}
+              <div className="absolute inset-2 border-4 border-transparent border-b-amber-500 border-l-amber-400 rounded-full animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }} />
               
-              {/* Center dot */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-yellow-500 rounded-full" />
+              {/* Inner pulsing glow */}
+              <div className="absolute inset-4 bg-gradient-to-br from-yellow-500/40 to-amber-500/40 rounded-full animate-pulse" />
+              
+              {/* Center dot with shadow */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full shadow-lg shadow-yellow-500/50" />
+            </div>
+
+            {/* Animated text */}
+            <div className="text-center z-10">
+              <h3 className="text-xl font-bold text-yellow-400 mb-2 animate-pulse">Generating Question</h3>
+              <p className="text-slate-400 text-sm">Preparing your knowledge check...</p>
+              
+              {/* Animated dots */}
+              <div className="flex justify-center space-x-2 mt-4">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
           </div>
         )}
@@ -133,18 +156,41 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
           </div>
         )}
 
-        {/* Evaluating State - Minimal & Clean */}
+        {/* Evaluating State - Enhanced */}
         {status === 'evaluating' && (
-          <div className="p-16 flex items-center justify-center">
-            <div className="relative w-20 h-20">
+          <div className="p-16 flex flex-col items-center justify-center relative overflow-hidden">
+            {/* Animated background orbs */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-1/3 left-1/3 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl animate-pulse" />
+              <div className="absolute bottom-1/3 right-1/3 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
+            </div>
+
+            {/* Enhanced spinner */}
+            <div className="relative w-24 h-24 mb-6 z-10">
               {/* Outer spinning ring */}
-              <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin" />
+              <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 border-r-purple-400 rounded-full animate-spin" />
               
-              {/* Inner pulsing circle */}
-              <div className="absolute inset-4 bg-purple-500/30 rounded-full animate-pulse" />
+              {/* Middle counter-spinning ring */}
+              <div className="absolute inset-2 border-4 border-transparent border-b-fuchsia-500 border-l-fuchsia-400 rounded-full animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }} />
               
-              {/* Center dot */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-purple-500 rounded-full" />
+              {/* Inner pulsing glow */}
+              <div className="absolute inset-4 bg-gradient-to-br from-purple-500/40 to-fuchsia-500/40 rounded-full animate-pulse" />
+              
+              {/* Center dot with shadow */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-gradient-to-br from-purple-400 to-fuchsia-500 rounded-full shadow-lg shadow-purple-500/50" />
+            </div>
+
+            {/* Animated text */}
+            <div className="text-center z-10">
+              <h3 className="text-xl font-bold text-purple-400 mb-2 animate-pulse">Evaluating Answer</h3>
+              <p className="text-slate-400 text-sm">Analyzing your response...</p>
+              
+              {/* Animated dots */}
+              <div className="flex justify-center space-x-2 mt-4">
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
           </div>
         )}
@@ -264,25 +310,47 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
           </div>
         )}
 
-        {/* Generating Follow-up State - Show loading with clear message */}
+        {/* Generating Follow-up State - Enhanced */}
         {status === 'generating_followup' && (
-          <div className="p-16 flex flex-col items-center justify-center">
-            <div className="relative w-20 h-20 mb-6">
+          <div className="p-16 flex flex-col items-center justify-center relative overflow-hidden">
+            {/* Animated background orbs */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-1/4 left-1/4 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+              <div className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }} />
+            </div>
+
+            {/* Enhanced multi-layer spinner */}
+            <div className="relative w-28 h-28 mb-8 z-10">
               {/* Outer spinning ring */}
-              <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
+              <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 border-r-blue-400 rounded-full animate-spin" />
               
-              {/* Inner pulsing circle */}
-              <div className="absolute inset-4 bg-blue-500/30 rounded-full animate-pulse" />
+              {/* Middle counter-spinning ring */}
+              <div className="absolute inset-3 border-4 border-transparent border-b-cyan-500 border-l-cyan-400 rounded-full animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }} />
               
-              {/* Center dot */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full" />
+              {/* Inner pulsing glow */}
+              <div className="absolute inset-6 bg-gradient-to-br from-blue-500/40 to-cyan-500/40 rounded-full animate-pulse" />
+              
+              {/* Center sparkle */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full shadow-lg shadow-blue-500/50" />
             </div>
             
-            <h2 className="text-2xl font-bold text-blue-400 mb-3">Generating New Lessons</h2>
-            <p className="text-lg text-slate-300 text-center max-w-md">
-              Creating personalized content based on your progress...
-            </p>
-            <p className="text-sm text-slate-500 mt-2">This may take a moment</p>
+            {/* Text content */}
+            <div className="text-center z-10 max-w-md">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent animate-pulse mb-3">
+                Generating New Lessons
+              </h2>
+              <p className="text-lg text-slate-300 mb-2">
+                Creating personalized content based on your progress...
+              </p>
+              <p className="text-sm text-slate-500">This may take a moment</p>
+              
+              {/* Animated progress dots */}
+              <div className="flex justify-center space-x-2 mt-6">
+                <div className="w-2.5 h-2.5 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full animate-bounce shadow-lg shadow-blue-500/50" style={{ animationDelay: '0ms' }} />
+                <div className="w-2.5 h-2.5 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-full animate-bounce shadow-lg shadow-cyan-500/50" style={{ animationDelay: '150ms' }} />
+                <div className="w-2.5 h-2.5 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full animate-bounce shadow-lg shadow-blue-500/50" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
           </div>
         )}
       </div>
