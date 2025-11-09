@@ -100,6 +100,7 @@ export interface VideoControllerState {
     reasoning?: string;
     error?: string;
   }>;
+  generateFollowUpVideos: (wasCorrect: boolean) => Promise<void>;
   
   // Legacy - kept for backward compatibility
   goToSegment: (index: number) => void;
@@ -1159,6 +1160,157 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   }, [currentNode, session, onError]);
   
   /**
+   * Generate follow-up videos based on answer correctness
+   * Creates adaptive learning path with more complex or simpler topics
+   */
+  const generateFollowUpVideos = useCallback(async (wasCorrect: boolean) => {
+    if (!currentNode || !currentSegment) {
+      console.warn('No current node to generate follow-up from');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+    setGenerationProgress(undefined);
+
+    try {
+      console.log(`Generating follow-up videos (answer was ${wasCorrect ? 'correct' : 'incorrect'})`);
+
+      // Build context for adaptive topic generation
+      const pathNodes = getPathFromRoot(session.tree, currentNode.id);
+      const branchPath = pathNodes.map(node => ({
+        nodeNumber: getNodeNumber(session.tree, node.id),
+        topic: node.segment.topic,
+        voiceoverScript: node.segment.voiceoverScript,
+      }));
+
+      // Import generateAdaptiveTopic from llmService
+      const { generateAdaptiveTopic } = await import('../services/llmService');
+
+      // Get adaptive topic based on correctness
+      const topicResult = await generateAdaptiveTopic(
+        currentSegment.topic,
+        branchPath,
+        wasCorrect,
+        session.context
+      );
+
+      if (!topicResult.success || !topicResult.topic) {
+        const errorMsg = topicResult.error || 'Failed to generate adaptive topic';
+        setError(errorMsg);
+        onError?.(errorMsg);
+        setIsGenerating(false);
+        return;
+      }
+
+      const adaptiveTopic = topicResult.topic;
+      console.log(`Adaptive topic generated: ${adaptiveTopic}`);
+
+      // Generate videos for the adaptive topic
+      const result = await generateVideoScenes(adaptiveTopic, (progress) => {
+        setGenerationProgress(progress);
+        console.log('Generation progress:', progress);
+      });
+
+      if (result.success && result.sections && result.sections.length > 0) {
+        const detailByUrl = new Map<string, SectionDetail>();
+        result.sectionDetails?.forEach((detail) => {
+          if (detail?.video_url) {
+            detailByUrl.set(detail.video_url, detail);
+          }
+        });
+
+        const scriptBySection = new Map<number, string>();
+        result.voiceoverScripts?.forEach((item) => {
+          if (typeof item?.section === 'number' && item.script) {
+            scriptBySection.set(item.section, item.script);
+          }
+        });
+
+        // Map section URLs to VideoSegments
+        const segments: VideoSegment[] = result.sections.map((sectionUrl, index) => {
+          const sectionMatch = sectionUrl.match(/section_(\d+)\.mp4/);
+          const detail = detailByUrl.get(sectionUrl);
+          const sectionNum = detail?.section ?? (sectionMatch ? parseInt(sectionMatch[1], 10) : index + 1);
+          const voiceoverScript =
+            (detail?.voiceover_script || '').trim() ||
+            (sectionNum !== undefined ? (scriptBySection.get(sectionNum) || '').trim() : '');
+          
+          return {
+            id: `followup_${Date.now()}_${sectionNum}`,
+            manimCode: '',
+            duration: 90,
+            hasQuestion: false,
+            questionText: undefined,
+            topic: detail?.title || adaptiveTopic,
+            difficulty: wasCorrect ? 'hard' : 'easy',
+            generatedAt: new Date().toISOString(),
+            videoUrl: sectionUrl,
+            thumbnailUrl: detail?.thumbnail_url,
+            title: detail?.title,
+            renderingStatus: 'completed',
+            voiceoverScript: voiceoverScript || undefined,
+          };
+        });
+
+        // Add segments as children of current question node (linear chain)
+        let parentNodeId = currentNode.id;
+        let firstNewNodeId: string | null = null;
+
+        for (let i = 0; i < segments.length; i++) {
+          const newNode = addChildNode(
+            session.tree,
+            parentNodeId,
+            segments[i],
+            i === 0 ? (wasCorrect ? 'Advanced' : 'Review') : undefined
+          );
+
+          if (i === 0) {
+            firstNewNodeId = newNode.id;
+          }
+
+          // Next segment will be child of this one (linear chain)
+          parentNodeId = newNode.id;
+        }
+
+        // Navigate to first new node
+        if (firstNewNodeId) {
+          navigateToNodeHelper(session.tree, firstNewNodeId);
+        }
+
+        // Update session context
+        const updatedContext = updateContext(session.context, {
+          previousTopic: adaptiveTopic,
+          historyTopics: [...session.context.historyTopics, adaptiveTopic],
+          depth: session.context.depth + 1,
+        });
+
+        const updatedSession = {
+          ...session,
+          context: updatedContext,
+          lastUpdatedAt: new Date().toISOString(),
+        };
+
+        setSession(updatedSession);
+        saveVideoSession(updatedSession);
+
+        console.log(`Generated ${segments.length} follow-up videos for adaptive topic: ${adaptiveTopic}`);
+      } else {
+        const errorMsg = result.error || 'Failed to generate follow-up videos';
+        setError(errorMsg);
+        onError?.(errorMsg);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMsg);
+      onError?.(errorMsg);
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(undefined);
+    }
+  }, [currentNode, currentSegment, session, onError]);
+
+  /**
    * Navigate to a specific segment by index (legacy compatibility)
    * @deprecated Use navigateToNode instead
    */
@@ -1194,6 +1346,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     closeQuiz,
     createQuestionNode,
     handleLeafQuestionAnswer,
+    generateFollowUpVideos,
     goToSegment,
   };
   

@@ -996,6 +996,168 @@ export async function generateClosingQuestion(
 }
 
 /**
+ * Generate an adaptive topic based on user's answer correctness
+ * Returns a more complex topic if correct, or a simpler topic if incorrect
+ */
+export async function generateAdaptiveTopic(
+  currentTopic: string,
+  branchPath: Array<{
+    nodeNumber: string;
+    topic: string;
+    voiceoverScript?: string;
+  }>,
+  wasCorrect: boolean,
+  context: LearningContext
+): Promise<{
+  success: boolean;
+  topic?: string;
+  error?: string;
+}> {
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    console.error('VITE_ANTHROPIC_API_KEY not configured');
+    return {
+      success: false,
+      error: 'API key not configured. Please add VITE_ANTHROPIC_API_KEY to your .env file.',
+    };
+  }
+
+  try {
+    // Build context from branch path
+    const pathContext = branchPath
+      .map((node) => {
+        const script = node.voiceoverScript ? ` (covered: ${node.voiceoverScript.substring(0, 100)}...)` : '';
+        return `- Node ${node.nodeNumber}: ${node.topic}${script}`;
+      })
+      .join('\n');
+
+    const historySummary = context.historyTopics.length > 0 
+      ? context.historyTopics.join(' → ') 
+      : 'No prior topics';
+
+    const difficultyInstruction = wasCorrect 
+      ? 'Generate a MORE COMPLEX or ADVANCED topic that builds upon what they learned. The topic should be related but more challenging - a natural next step for someone who understands the current material well.'
+      : 'Generate a SIMPLER or MORE FUNDAMENTAL topic that reinforces the basics. The topic should be related but easier - helping them build confidence with prerequisite concepts.';
+
+    const prompt = `You are an adaptive learning system that personalizes the learning journey based on student performance.
+
+CURRENT TOPIC:
+${currentTopic}
+
+LEARNING PATH COMPLETED:
+${pathContext}
+
+TOPIC HISTORY:
+${historySummary}
+
+STUDENT PERFORMANCE:
+${wasCorrect ? '✓ Answered correctly - demonstrating understanding' : '✗ Answered incorrectly - needs more foundation'}
+
+YOUR TASK:
+${difficultyInstruction}
+
+GUIDELINES:
+1. Stay within the same general domain/subject area
+2. Make the difficulty adjustment meaningful but not extreme
+3. The new topic should feel like a natural continuation of their learning
+4. Keep the topic concise (max 10 words)
+5. Make it specific and concrete, not vague
+
+GOOD EXAMPLES (if current topic is "Binary Search Trees"):
+- If correct: "Self-balancing AVL trees and rotation operations"
+- If incorrect: "Basic binary tree structure and traversal"
+
+GOOD EXAMPLES (if current topic is "React Hooks"):
+- If correct: "Custom hooks and advanced composition patterns"  
+- If incorrect: "Component state and useState basics"
+
+RESPONSE FORMAT (JSON only, no markdown):
+{
+  "next_topic": "Your specific topic string here"
+}
+
+Generate the adaptive topic now:`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 512,
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Claude API request failed:', response.status, errorData);
+      return {
+        success: false,
+        error: `Claude API request failed: ${response.status} ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    const textContent = data.content?.[0]?.text;
+
+    if (!textContent) {
+      console.error('No text content in response:', data);
+      return {
+        success: false,
+        error: 'No content received from Claude API',
+      };
+    }
+
+    // Parse the JSON response
+    const cleanedJSON = cleanJSONResponse(textContent);
+    let parsedData: any;
+
+    try {
+      parsedData = JSON.parse(cleanedJSON);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Received text:', textContent);
+      return {
+        success: false,
+        error: 'Failed to parse adaptive topic JSON from API response',
+      };
+    }
+
+    const nextTopic = parsedData.next_topic || parsedData.topic;
+
+    if (typeof nextTopic === 'string' && nextTopic.trim()) {
+      return {
+        success: true,
+        topic: nextTopic.trim(),
+      };
+    }
+
+    return {
+      success: false,
+      error: 'No topic found in API response',
+    };
+  } catch (error) {
+    console.error('Adaptive topic generation error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred during adaptive topic generation',
+    };
+  }
+}
+
+/**
  * Build the prompt for generating a closing question
  */
 function buildClosingQuestionPrompt(payload: ClosingQuestionPayload): string {

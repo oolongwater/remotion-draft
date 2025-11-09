@@ -7,6 +7,7 @@
  * - evaluating: Checking answer (purple spinner)
  * - correct: Green celebration UI with "Continue Learning" button
  * - incorrect: Orange "not quite right" message + loading remediation video
+ * - generating_followup: Blue loading state while generating follow-up videos
  * - error: Red error state with retry option
  */
 
@@ -16,13 +17,14 @@ import { LoadingSpinner } from './LoadingSpinner';
 interface LeafQuestionOverlayProps {
   isOpen: boolean;
   question?: string;
-  status: 'idle' | 'loading' | 'ready' | 'evaluating' | 'correct' | 'incorrect' | 'error';
+  status: 'idle' | 'loading' | 'ready' | 'evaluating' | 'correct' | 'incorrect' | 'error' | 'generating_followup';
   answer: string;
   reasoning?: string;
   error?: string;
   onAnswerChange: (answer: string) => void;
   onSubmit: (answer: string) => Promise<void>;
   onContinue: () => void;
+  onContinueLearning?: (wasCorrect: boolean) => void;
   onRetry?: () => void;
   onStartOver?: () => void;
 }
@@ -37,6 +39,7 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
   onAnswerChange,
   onSubmit,
   onContinue,
+  onContinueLearning,
   onRetry,
   onStartOver,
 }) => {
@@ -160,12 +163,33 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
                 <p className="text-sm text-slate-300">{reasoning}</p>
               </div>
             )}
-            <button
-              onClick={onContinue}
-              className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all text-lg"
-            >
-              Continue Learning →
-            </button>
+            
+            {/* Continue Learning Prompt */}
+            <div className="mb-8 p-6 bg-slate-900/50 border border-slate-700 rounded-lg">
+              <p className="text-xl text-white mb-6">
+                Do you want to continue learning?
+              </p>
+              <p className="text-sm text-slate-400">
+                We'll generate a more complex topic to challenge your understanding
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {onContinueLearning && (
+                <button
+                  onClick={() => onContinueLearning(true)}
+                  className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all text-lg"
+                >
+                  Yes, Continue Learning →
+                </button>
+              )}
+              <button
+                onClick={onContinue}
+                className="px-8 py-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all text-lg border border-slate-600"
+              >
+                No, I'm Done
+              </button>
+            </div>
           </div>
         )}
 
@@ -183,21 +207,32 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
                 <p className="text-base text-slate-200 leading-relaxed">{reasoning}</p>
               </div>
             )}
+            
+            {/* Continue Learning Prompt */}
+            <div className="mb-8 p-6 bg-slate-900/50 border border-slate-700 rounded-lg">
+              <p className="text-xl text-white mb-6">
+                Do you want to continue learning?
+              </p>
+              <p className="text-sm text-slate-400">
+                We'll review a simpler topic to reinforce the fundamentals
+              </p>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={onContinue}
-                className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all text-lg"
-              >
-                Continue Learning →
-              </button>
-              {onStartOver && (
+              {onContinueLearning && (
                 <button
-                  onClick={onStartOver}
-                  className="px-8 py-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all text-lg border border-slate-600"
+                  onClick={() => onContinueLearning(false)}
+                  className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all text-lg"
                 >
-                  Start Over
+                  Yes, Continue Learning →
                 </button>
               )}
+              <button
+                onClick={onContinue}
+                className="px-8 py-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all text-lg border border-slate-600"
+              >
+                No, I'm Done
+              </button>
             </div>
           </div>
         )}
@@ -226,6 +261,28 @@ export const LeafQuestionOverlay: React.FC<LeafQuestionOverlayProps> = ({
                 Continue Anyway
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Generating Follow-up State - Show loading with clear message */}
+        {status === 'generating_followup' && (
+          <div className="p-16 flex flex-col items-center justify-center">
+            <div className="relative w-20 h-20 mb-6">
+              {/* Outer spinning ring */}
+              <div className="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
+              
+              {/* Inner pulsing circle */}
+              <div className="absolute inset-4 bg-blue-500/30 rounded-full animate-pulse" />
+              
+              {/* Center dot */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-blue-400 mb-3">Generating New Lessons</h2>
+            <p className="text-lg text-slate-300 text-center max-w-md">
+              Creating personalized content based on your progress...
+            </p>
+            <p className="text-sm text-slate-500 mt-2">This may take a moment</p>
           </div>
         )}
       </div>

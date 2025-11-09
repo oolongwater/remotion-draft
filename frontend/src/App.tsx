@@ -73,7 +73,7 @@ export const App: React.FC = () => {
   // Leaf question state
   const [leafQuestion, setLeafQuestion] = useState<string | null>(null);
   const [leafQuestionStatus, setLeafQuestionStatus] = useState<
-    "idle" | "loading" | "ready" | "evaluating" | "correct" | "incorrect" | "error"
+    "idle" | "loading" | "ready" | "evaluating" | "correct" | "incorrect" | "error" | "generating_followup"
   >("idle");
   const [leafQuestionAnswer, setLeafQuestionAnswer] = useState<string>("");
   const [leafEvaluationReasoning, setLeafEvaluationReasoning] = useState<string>("");
@@ -97,6 +97,9 @@ export const App: React.FC = () => {
 
   // Track if user has seen a video (to prevent question overlay on initial mount)
   const [hasSeenFirstVideo, setHasSeenFirstVideo] = useState(false);
+
+  // Track if follow-up videos are being generated (to prevent duplicate question overlay)
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
 
   /**
    * Check for cached session on mount
@@ -373,6 +376,7 @@ export const App: React.FC = () => {
             closeQuiz,
             createQuestionNode,
             handleLeafQuestionAnswer,
+            generateFollowUpVideos,
             goToSegment,
             activeGenerations,
             removeGenerationRequest,
@@ -497,7 +501,7 @@ export const App: React.FC = () => {
             }, [currentSegment?.id, currentSegment?.isQuestionNode]);
             
             useEffect(() => {
-              if (currentSegment?.isQuestionNode && leafQuestionStatus === "idle" && hasSeenFirstVideo) {
+              if (currentSegment?.isQuestionNode && leafQuestionStatus === "idle" && hasSeenFirstVideo && !isGeneratingFollowUp) {
                 // Extract the question from the segment
                 if (currentSegment.questionText) {
                   setLeafQuestion(currentSegment.questionText);
@@ -508,7 +512,7 @@ export const App: React.FC = () => {
                 // Reset state when leaving question node
                 resetLeafQuestionState();
               }
-            }, [currentSegment?.id, currentSegment?.isQuestionNode, currentSegment?.questionText, leafQuestionStatus, resetLeafQuestionState, hasSeenFirstVideo]);
+            }, [currentSegment?.id, currentSegment?.isQuestionNode, currentSegment?.questionText, leafQuestionStatus, resetLeafQuestionState, hasSeenFirstVideo, isGeneratingFollowUp]);
 
             // NOW we can do conditional returns
 
@@ -583,6 +587,28 @@ export const App: React.FC = () => {
                       }
                     } else {
                       setLeafQuestionStatus('error');
+                    }
+                  }}
+                  onContinueLearning={async (wasCorrect) => {
+                    // Set flag to prevent duplicate question overlay
+                    setIsGeneratingFollowUp(true);
+                    
+                    // Show loading state in overlay instead of closing
+                    setLeafQuestionStatus('generating_followup');
+                    
+                    try {
+                      // Generate follow-up videos based on answer correctness
+                      await generateFollowUpVideos(wasCorrect);
+                      
+                      // After successful generation, close overlay
+                      resetLeafQuestionState();
+                    } catch (error) {
+                      console.error('Error generating follow-up videos:', error);
+                      // On error, show error state
+                      setLeafQuestionStatus('error');
+                    } finally {
+                      // Always reset flag
+                      setIsGeneratingFollowUp(false);
                     }
                   }}
                   onContinue={() => {
