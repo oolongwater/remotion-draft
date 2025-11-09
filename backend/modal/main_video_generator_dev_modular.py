@@ -130,13 +130,14 @@ def render_single_scene(
     section_num: int,
     manim_code: str,
     work_dir_path: str,
-    job_id: str
+    job_id: str,
+    voice_id: Optional[str] = None
 ) -> Tuple[int, str, str]:
     """
     Render a single Manim scene in its own container.
     Delegates to pure Python logic function.
     """
-    return render_single_scene_logic(section_num, manim_code, work_dir_path, job_id)
+    return render_single_scene_logic(section_num, manim_code, work_dir_path, job_id, voice_id)
 
 
 @app.function(
@@ -153,7 +154,8 @@ def generate_educational_video(
     job_id: Optional[str] = None,
     image_context: Optional[str] = None,
     clerk_user_id: Optional[str] = None,
-    mode: str = "deep"
+    mode: str = "deep",
+    voice_id: Optional[str] = None
 ):
     """
     Generate a complete educational video from a prompt with optional image context.
@@ -165,6 +167,7 @@ def generate_educational_video(
         image_context: Optional base64-encoded image for visual context
         clerk_user_id: Optional Clerk user ID for user association
         mode: Generation mode - "deep" (Anthropic Sonnet) or "fast" (Cerebras Qwen)
+        voice_id: Optional ElevenLabs voice ID for text-to-speech
     """
     # Pass the render function reference to the logic
     yield from generate_educational_video_logic(
@@ -173,7 +176,8 @@ def generate_educational_video(
         image_context=image_context,
         clerk_user_id=clerk_user_id,
         render_single_scene_fn=render_single_scene,
-        mode=mode
+        mode=mode,
+        voice_id=voice_id
     )
 
 

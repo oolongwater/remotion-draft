@@ -22,7 +22,8 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
             "clerk_user_id": "optional clerk user id",
             "mode": "deep or fast (default: deep)",
             "code_iterations": 1,
-            "video_iterations": 1
+            "video_iterations": 1,
+            "voice_id": "optional ElevenLabs voice ID"
         }
 
     Returns:
@@ -41,6 +42,7 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
     image_context = item.get("image_context")  # Base64 encoded image
     clerk_user_id = item.get("clerk_user_id")  # Clerk user ID for user association
     mode = item.get("mode", "deep")  # Generation mode: "deep" or "fast"
+    voice_id = item.get("voice_id")  # ElevenLabs voice ID
 
     # Log what we received
     print(f"📥 Received API request:")
@@ -49,6 +51,7 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
     print(f"   Mode: {mode}")
     print(f"   Has image: {bool(image_context)}")
     print(f"   Clerk User ID: {clerk_user_id}")
+    print(f"   Voice ID: {voice_id}")
 
     # Check cache (skip if image_context is provided, as it affects generation)
     if not image_context:
@@ -100,7 +103,8 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
                 job_id=job_id,
                 image_context=image_context,
                 clerk_user_id=clerk_user_id,
-                mode=mode
+                mode=mode,
+                voice_id=voice_id
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:

@@ -15,17 +15,21 @@ class PreGeneratedAudioService(SpeechService):
     This allows using pre-generated audio with VoiceoverScene.
     """
 
-    def __init__(self, audio_file_path: str, fallback_to_elevenlabs: bool = True, **kwargs):
+    def __init__(self, audio_file_path: str, fallback_to_elevenlabs: bool = True, voice_id: str = None, **kwargs):
         """
         Initialize with path to pre-generated audio file.
 
         Args:
             audio_file_path: Path to the pre-generated audio file (.mp3)
             fallback_to_elevenlabs: If True, fall back to ElevenLabsService if audio file doesn't exist
+            voice_id: Optional voice ID for ElevenLabs fallback. Defaults to male voice if not provided.
         """
         self.audio_file_path = Path(audio_file_path)
         self.fallback_to_elevenlabs = fallback_to_elevenlabs
         self.audio_exists = self.audio_file_path.exists()
+        
+        # Use provided voice_id or default
+        selected_voice_id = voice_id or "pqHfZKP75CvOlQylNhV4"
         
         if not self.audio_exists:
             if fallback_to_elevenlabs:
@@ -35,7 +39,7 @@ class PreGeneratedAudioService(SpeechService):
                 from manim_voiceover.services.elevenlabs import ElevenLabsService
                 # Store fallback service
                 self._fallback_service = ElevenLabsService(
-                    voice_id="pqHfZKP75CvOlQylNhV4",
+                    voice_id=selected_voice_id,
                     transcription_model=None,
                     **kwargs
                 )

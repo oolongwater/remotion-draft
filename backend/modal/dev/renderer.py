@@ -12,7 +12,8 @@ def render_single_scene_logic(
     section_num: int,
     manim_code: str,
     work_dir_path: str,
-    job_id: str
+    job_id: str,
+    voice_id: str = None
 ) -> Tuple[int, str, str]:
     """
     Render a single Manim scene in its own container.
@@ -22,6 +23,7 @@ def render_single_scene_logic(
         manim_code: Python code for the Manim scene
         work_dir_path: Path to working directory
         job_id: Unique job identifier
+        voice_id: Optional voice ID for TTS. Defaults to male voice if not provided.
 
     Returns:
         Tuple of (section_num, video_path, error_message)
@@ -42,8 +44,8 @@ def render_single_scene_logic(
     print(f"{'━'*60}")
 
     # Apply code cleanup
-    manim_code = clean_manim_code(manim_code)
-    manim_code = apply_all_manual_fixes(manim_code)
+    manim_code = clean_manim_code(manim_code, voice_id)
+    manim_code = apply_all_manual_fixes(manim_code, voice_id)
 
     # Save code
     code_file = work_dir / f"section_{section_num}.py"
@@ -222,13 +224,16 @@ def render_single_scene_logic(
                 error_analysis = ""
                 if result.stderr:
                     stderr_lower = result.stderr.lower()
+                    # Use selected voice_id or default
+                    selected_voice_id = voice_id or "pqHfZKP75CvOlQylNhV4"
+                    
                     if 'eoferror' in stderr_lower:
                         if 'recorderservice' in stderr_lower or 'recorder' in stderr_lower:
-                            error_analysis += "\n\nCRITICAL: EOFError - RecorderService requires additional packages and causes interactive prompts. Replace RecorderService with ElevenLabsService(voice_id=\"pqHfZKP75CvOlQylNhV4\", transcription_model=None)."
+                            error_analysis += f"\n\nCRITICAL: EOFError - RecorderService requires additional packages and causes interactive prompts. Replace RecorderService with ElevenLabsService(voice_id=\"{selected_voice_id}\", transcription_model=None)."
                         else:
                             error_analysis += "\n\nCRITICAL: EOFError detected. This happens when manim-voiceover tries to prompt for missing packages. Ensure transcription_model=None is set and never call set_transcription()."
                     if 'importerror' in stderr_lower and 'create_voiceover_tracker' in stderr_lower:
-                        error_analysis += "\n\nCRITICAL: ImportError - create_voiceover_tracker doesn't exist in manim_voiceover. For pre-generated audio, use PreGeneratedAudioService from services.tts.pregenerated instead. Use VoiceoverScene with self.set_speech_service(PreGeneratedAudioService(audio_file_path=path))."
+                        error_analysis += f"\n\nCRITICAL: ImportError - create_voiceover_tracker doesn't exist in manim_voiceover. For pre-generated audio, use PreGeneratedAudioService from services.tts.pregenerated instead. Use VoiceoverScene with self.set_speech_service(PreGeneratedAudioService(audio_file_path=path, voice_id=\"{selected_voice_id}\"))."
                     if 'importerror' in stderr_lower and 'manim_voiceover.services.tts' in stderr_lower:
                         error_analysis += "\n\nCRITICAL: ImportError - PreGeneratedAudioService must be imported from services.tts.pregenerated, NOT from manim_voiceover.services.tts. Fix: from services.tts.pregenerated import PreGeneratedAudioService"
                     if 'typeerror' in stderr_lower and 'vgroup' in stderr_lower and 'vmobject' in stderr_lower:
@@ -248,7 +253,7 @@ def render_single_scene_logic(
                             missing_attr = attr_match.group(1)
                             error_analysis += f"\n\nCRITICAL: AttributeError - Missing attribute '{missing_attr}'. Remove calls to non-existent methods/attributes."
                     if 'tts_init' in stderr_lower or '{tts_init}' in current_code:
-                        error_analysis += "\n\nCRITICAL: Found placeholder '{tts_init}' in code. Replace with actual ElevenLabsService initialization: ElevenLabsService(voice_id=\"pqHfZKP75CvOlQylNhV4\", transcription_model=None)"
+                        error_analysis += f"\n\nCRITICAL: Found placeholder '{{tts_init}}' in code. Replace with actual ElevenLabsService initialization: ElevenLabsService(voice_id=\"{selected_voice_id}\", transcription_model=None)"
                 
                 repair_prompt = f"""The following Manim code failed to render. Please fix ALL errors.
 
@@ -265,7 +270,7 @@ ERROR OUTPUT (stderr):
 {error_analysis}
 
 REQUIREMENTS:
-1. Use ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None) - NEVER use transcription_model or set_transcription()
+1. Use ElevenLabsService(voice_id="{selected_voice_id}", transcription_model=None) - NEVER use transcription_model or set_transcription()
 2. For pre-generated audio, use PreGeneratedAudioService from services.tts.pregenerated (NOT from manim_voiceover.services.tts)
 3. NEVER import create_voiceover_tracker - it doesn't exist in manim_voiceover
 4. NEVER use RecorderService - it causes EOFError prompts. Use ElevenLabsService instead.
@@ -289,8 +294,8 @@ Return ONLY the fixed Python code."""
                     repaired_code = repaired_code.split('```')[1].split('```')[0].strip()
 
                 # Clean repaired code
-                repaired_code = clean_manim_code(repaired_code)
-                repaired_code = apply_all_manual_fixes(repaired_code)
+                repaired_code = clean_manim_code(repaired_code, voice_id)
+                repaired_code = apply_all_manual_fixes(repaired_code, voice_id)
 
                 current_file = work_dir / f"section_{section_num}_repaired.py"
                 current_file.write_text(repaired_code)

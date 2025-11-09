@@ -6,12 +6,18 @@ Using original prompts verbatim from backend/prompts.py
 import os
 
 # TTS Provider Configuration - ElevenLabs only
-ELEVENLABS_VOICE_ID = "pqHfZKP75CvOlQylNhV4"
+ELEVENLABS_VOICE_ID_DEFAULT = "pqHfZKP75CvOlQylNhV4"
 
-def get_tts_initialization_code():
-    """Generate TTS initialization code for ElevenLabs."""
+def get_tts_initialization_code(voice_id=None):
+    """
+    Generate TTS initialization code for ElevenLabs.
+    
+    Args:
+        voice_id: Optional voice ID to use. Defaults to male voice if not provided.
+    """
+    selected_voice_id = voice_id or ELEVENLABS_VOICE_ID_DEFAULT
     return f'''from tts import ElevenLabsTimedService
-  self.set_speech_service(ElevenLabsTimedService(voice_id="{ELEVENLABS_VOICE_ID}", transcription_model=None))'''
+  self.set_speech_service(ElevenLabsTimedService(voice_id="{selected_voice_id}", transcription_model=None))'''
 
 MEGA_PLAN_PROMPT = """You are an educational video planner. Create a simple plan for an educational explainer video on any topic.
 
@@ -182,7 +188,7 @@ class ExplainerScene(Scene):
 ❌ **NEVER USE**: `RecorderService()` - It requires additional packages and causes EOFError prompts
 ✅ **CORRECT**: For standard Scene class, use only 2D elements: Axes(), NumberPlane(), .shift(), .move_to()
 ✅ **CORRECT**: For 3D, you MUST inherit from ThreeDScene: `class MyScene(ThreeDScene):`
-✅ **CORRECT**: For audio, ALWAYS use: `self.set_speech_service(ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4"))`
+✅ **CORRECT**: For audio, use the EXACT TTS initialization provided in the template above
 ❌ **NEVER USE**: transcription_model parameter - it requires additional packages and causes errors
 ✅ **CORRECT**: For pre-generated audio, use: `from services.tts.pregenerated import PreGeneratedAudioService` (NOT from manim_voiceover.services.tts)
 
@@ -245,6 +251,11 @@ REMEMBER: Focus on QUALITY over QUANTITY - one concept explained well in 90 seco
 ## Output Format:
 Generate only the Python code. Start with imports, follow with the Scene class. Make it self-contained and runnable. Include comments for complex sections. The animation should be educational, visually engaging, and accurate to the subject matter."""
 
-def get_manim_prompt():
-    """Get the Manim prompt with TTS initialization code injected."""
-    return MANIM_META_PROMPT.format(tts_init=get_tts_initialization_code())
+def get_manim_prompt(voice_id=None):
+    """
+    Get the Manim prompt with TTS initialization code injected.
+    
+    Args:
+        voice_id: Optional voice ID to use for TTS. Defaults to male voice if not provided.
+    """
+    return MANIM_META_PROMPT.format(tts_init=get_tts_initialization_code(voice_id))

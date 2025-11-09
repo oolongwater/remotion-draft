@@ -60,7 +60,8 @@ def generate_educational_video_logic(
     image_context: Optional[str] = None,
     clerk_user_id: Optional[str] = None,
     render_single_scene_fn: Optional[Callable] = None,
-    mode: str = "deep"
+    mode: str = "deep",
+    voice_id: Optional[str] = None
 ):
     """
     Generate a complete educational video from a prompt with optional image context.
@@ -74,6 +75,7 @@ def generate_educational_video_logic(
         mode: Generation mode - "deep" (slower, higher quality) or "fast" (faster, good quality)
               - deep: Uses Anthropic Claude Sonnet 4.5 for code generation
               - fast: Uses Cerebras Qwen 3 for code generation
+        voice_id: Optional ElevenLabs voice ID (defaults to male voice if not specified)
 
     Yields:
         Progress updates and final video URL
@@ -329,8 +331,12 @@ def generate_educational_video_logic(
 
         from services.tts import ElevenLabsTimedService
         
+        # Use provided voice_id or default to male voice
+        selected_voice_id = voice_id or "pqHfZKP75CvOlQylNhV4"
+        capture_log(f"Using voice ID: {selected_voice_id}", "info")
+        
         tts_service = ElevenLabsTimedService(
-            voice_id="pqHfZKP75CvOlQylNhV4",
+            voice_id=selected_voice_id,
             transcription_model=None
         )
         
@@ -370,7 +376,7 @@ def generate_educational_video_logic(
 
                 # Prepare system prompt (Manim guidelines and requirements)
                 from services.prompts import get_manim_prompt
-                system_prompt = get_manim_prompt()
+                system_prompt = get_manim_prompt(voice_id)
                 
                 # Prepare user prompt (section-specific information)
                 # Note: Audio will be generated later based on extracted script
@@ -408,8 +414,8 @@ Use ElevenLabsService for voiceover generation."""
                 # Clean the code to remove problematic parameters
                 from services.code_utils import apply_all_manual_fixes, clean_manim_code
 
-                manim_code = clean_manim_code(manim_code)
-                manim_code = apply_all_manual_fixes(manim_code)
+                manim_code = clean_manim_code(manim_code, voice_id)
+                manim_code = apply_all_manual_fixes(manim_code, voice_id)
                 print(f"✓ [Section {section_num} V{variant_num}] Code cleaned and fixed")
 
                 # Extract voiceover narration script for this section
@@ -452,7 +458,7 @@ Use ElevenLabsService for voiceover generation."""
                     
                 try:
                     print(f"🚀 [Section {section_num} V{variant_num}] Spawning render container...")
-                    render_call = render_single_scene_fn.spawn(section_num, code, str(work_dir), job_id)
+                    render_call = render_single_scene_fn.spawn(section_num, code, str(work_dir), job_id, voice_id)
                     
                     # Wait for render to complete
                     print(f"⏳ [Section {section_num} V{variant_num}] Waiting for render...")
@@ -500,8 +506,8 @@ Use ElevenLabsService for voiceover generation."""
                         )
                         
                         # First, try rule-based fixes
-                        fixed_code = clean_manim_code(code)
-                        fixed_code = apply_all_manual_fixes(fixed_code)
+                        fixed_code = clean_manim_code(code, voice_id)
+                        fixed_code = apply_all_manual_fixes(fixed_code, voice_id)
                         
                         # Additional aggressive fixes for common errors
                         import re
@@ -581,8 +587,8 @@ Generate the fixed code now:"""
                             repaired_code = repaired_code.split('```')[1].split('```')[0].strip()
                         
                         # Apply final cleanup
-                        repaired_code = clean_manim_code(repaired_code)
-                        repaired_code = apply_all_manual_fixes(repaired_code)
+                        repaired_code = clean_manim_code(repaired_code, voice_id)
+                        repaired_code = apply_all_manual_fixes(repaired_code, voice_id)
                         
                         print(f"✅ [Section {section_num} V{variant_num}] Sonnet 4.5 repair complete")
                         return (variant_num, repaired_code)
@@ -831,9 +837,12 @@ Generate the fixed code now:"""
             import re
             audio_path = f"/outputs/{job_id}/voiceovers/section_{section_num}.mp3"
             
+            # Use selected voice_id
+            selected_voice_id = voice_id or "pqHfZKP75CvOlQylNhV4"
+            
             # Pattern to match set_speech_service with ElevenLabsService
             elevenlabs_pattern = r'self\.set_speech_service\(ElevenLabsTimedService\([^)]*\)\)'
-            replacement = f'self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True))'
+            replacement = f'self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True, voice_id="{selected_voice_id}"))'
             
             patched = re.sub(elevenlabs_pattern, replacement, patched)
             
@@ -851,12 +860,12 @@ Generate the fixed code now:"""
                         continue
                         
                     if "set_speech_service" in line and "ElevenLabsTimedService" in line:
-                        new_lines.append(f'        self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True))')
+                        new_lines.append(f'        self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True, voice_id="{selected_voice_id}"))')
                         in_tts_setup = False
                     elif "set_speech_service" in line:
                         # Multi-line set_speech_service
                         in_tts_setup = True
-                        new_lines.append(f'        self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True))')
+                        new_lines.append(f'        self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True, voice_id="{selected_voice_id}"))')
                     elif in_tts_setup and ("ElevenLabsTimedService" in line or ")" in line):
                         # Skip lines that are part of the old set_speech_service call
                         in_tts_setup = ")" not in line
