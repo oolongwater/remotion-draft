@@ -56,12 +56,18 @@ image = (
         "anthropic>=0.40.0",
         "cerebras-cloud-sdk",
         "optillm",  # For CePO (Cerebras Planning & Optimization)
+        "google-cloud-storage>=2.10.0",
     )
     .add_local_file("../llm.py", "/root/llm.py")
     .add_local_file("../tts.py", "/root/tts.py")  # TTS service (ElevenLabs)
     .add_local_file("prompts.py", "/root/prompts.py")
     .add_local_file("code_cleanup.py", "/root/code_cleanup.py")
     .add_local_file("manual_code_helpers.py", "/root/manual_code_helpers.py")
+    # Add services directory as a Python package (for cache_service and gcs_storage)
+    .add_local_dir(
+        "services",
+        "/root/services"
+    )
 )
 
 # Create volumes for caching and storage
@@ -778,18 +784,51 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
         print(f"{'='*60}\n")
         print(f"   Final video: {final_video.name} ({final_size:.2f} MB)")
 
-        yield update_job_progress({
+        # Build final video URL (construct based on GCS pattern even if not uploaded)
+        final_video_url = f"https://storage.googleapis.com/vid-gen-static/{job_id}/final.mp4"
+
+        # Prepare response data
+        response_data = {
             "status": "completed",
             "progress_percentage": 100,
             "message": "Video generation completed successfully!",
             "video_path": str(final_video),
             "job_id": job_id,
+            "final_video_url": final_video_url,
             "metadata": {
                 "prompt": prompt,
                 "file_size_mb": round(final_size, 2),
                 "note": "Upload disabled - video saved locally"
             }
-        })
+        }
+
+        # Store cache (skip if image_context is provided, as it affects generation)
+        if not image_context:
+            try:
+                from services.cache_service import get_cache_service
+                cache_service = get_cache_service()
+                
+                # Build cache data structure
+                # Production version is simpler - doesn't track sections/thumbnails like dev version
+                num_sections = len(scene_videos) if scene_videos else 0
+                cache_data = {
+                    "job_id": job_id,
+                    "final_video_url": final_video_url,
+                    "sections": [],  # Production version doesn't track individual sections
+                    "section_details": [],  # Production version doesn't track section details
+                    "metadata": {
+                        "prompt": prompt,
+                        "file_size_mb": round(final_size, 2),
+                        "num_sections": num_sections
+                    }
+                }
+                
+                cache_service.store_cache(prompt, cache_data)
+            except Exception as e:
+                # Cache storage failed, but this is non-fatal
+                print(f"⚠️  Cache storage error (non-fatal): {type(e).__name__}: {e}")
+
+        yield update_job_progress(response_data)
 
     except Exception as e:
         import traceback
@@ -860,6 +899,45 @@ async def generate_video_api(item: dict):
     print(f"   Job ID: {job_id}")
     print(f"   Has image: {bool(image_context)}")
     print(f"   Clerk User ID: {clerk_user_id}")
+
+    # Check cache (skip if image_context is provided, as it affects generation)
+    if not image_context:
+        try:
+            from services.cache_service import get_cache_service
+            cache_service = get_cache_service()
+            cached_result = cache_service.get_cache(prompt)
+            
+            if cached_result:
+                print(f"✓ Returning cached result for prompt")
+                
+                def cached_event_stream():
+                    """Stream cached result as SSE"""
+                    # Return cached result as completed status
+                    cached_update = {
+                        "status": "completed",
+                        "progress_percentage": 100,
+                        "message": "Video generation completed successfully! (from cache)",
+                        "job_id": cached_result.get("job_id", job_id),
+                        "sections": cached_result.get("sections", []),
+                        "section_details": cached_result.get("section_details", []),
+                        "final_video_url": cached_result.get("final_video_url"),
+                        "metadata": cached_result.get("metadata", {}),
+                        "cached": True
+                    }
+                    yield f"data: {json.dumps(cached_update)}\n\n"
+                
+                return StreamingResponse(
+                    cached_event_stream(),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "X-Accel-Buffering": "no"
+                    }
+                )
+        except Exception as e:
+            # Cache check failed, continue with normal generation
+            print(f"⚠️  Cache check error (continuing with generation): {type(e).__name__}: {e}")
 
     def event_stream():
         """Stream progress updates as SSE"""

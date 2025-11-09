@@ -969,6 +969,7 @@ Return ONLY the title text, nothing else."""
         })
 
         final_video = work_dir / f"{job_id}_final.mp4"
+        final_video_url = None
 
         if len(scene_videos) == 1:
             # Only one video, just rename it
@@ -981,7 +982,8 @@ Return ONLY the title text, nothing else."""
                 from services.gcs_storage import upload_final_video
                 upload_result = upload_final_video(str(final_video), job_id)
                 if upload_result and upload_result.get("success"):
-                    print(f"✓ Final video uploaded to GCS: {upload_result.get('public_url')}")
+                    final_video_url = upload_result.get('public_url')
+                    print(f"✓ Final video uploaded to GCS: {final_video_url}")
                 else:
                     print(f"⚠️  GCS upload failed: {upload_result.get('error', 'Unknown error') if upload_result else 'No result'}")
             except Exception as e:
@@ -1019,7 +1021,8 @@ Return ONLY the title text, nothing else."""
                     from services.gcs_storage import upload_final_video
                     upload_result = upload_final_video(str(final_video), job_id)
                     if upload_result and upload_result.get("success"):
-                        print(f"✓ Final video uploaded to GCS: {upload_result.get('public_url')}")
+                        final_video_url = upload_result.get('public_url')
+                        print(f"✓ Final video uploaded to GCS: {final_video_url}")
                     else:
                         print(f"⚠️  GCS upload failed: {upload_result.get('error', 'Unknown error') if upload_result else 'No result'}")
                 except Exception as e:
@@ -1075,7 +1078,12 @@ Return ONLY the title text, nothing else."""
         print(f"{'='*60}\n")
         print(f"   Final video: {final_video.name} ({final_size:.2f} MB)")
 
-        yield update_job_progress({
+        # Build final video URL if not already set
+        if not final_video_url:
+            final_video_url = f"https://storage.googleapis.com/vid-gen-static/{job_id}/final.mp4"
+
+        # Prepare response data
+        response_data = {
             "status": "completed",
             "progress_percentage": 100,
             "message": "Video generation completed successfully!",
@@ -1083,6 +1091,7 @@ Return ONLY the title text, nothing else."""
             "job_id": job_id,
             "sections": section_urls,  # List of section video URLs
             "section_details": section_details,
+            "final_video_url": final_video_url,
             "metadata": {
                 "prompt": prompt,
                 "file_size_mb": round(final_size, 2),
@@ -1096,7 +1105,40 @@ Return ONLY the title text, nothing else."""
                     for section_num in sorted(section_scripts.keys())
                 ]
             }
-        })
+        }
+
+        # Store cache (skip if image_context is provided, as it affects generation)
+        if not image_context:
+            try:
+                from services.cache_service import get_cache_service
+                cache_service = get_cache_service()
+                
+                # Build cache data structure
+                cache_data = {
+                    "job_id": job_id,
+                    "final_video_url": final_video_url,
+                    "sections": section_urls,
+                    "section_details": section_details,
+                    "metadata": {
+                        "prompt": prompt,
+                        "file_size_mb": round(final_size, 2),
+                        "num_sections": len(section_urls),
+                        "voiceover_scripts": [
+                            {
+                                "section": section_num,
+                                "script": section_scripts.get(section_num, "")
+                            }
+                            for section_num in sorted(section_scripts.keys())
+                        ]
+                    }
+                }
+                
+                cache_service.store_cache(prompt, cache_data)
+            except Exception as e:
+                # Cache storage failed, but this is non-fatal
+                print(f"⚠️  Cache storage error (non-fatal): {type(e).__name__}: {e}")
+
+        yield update_job_progress(response_data)
 
     except Exception as e:
         import traceback

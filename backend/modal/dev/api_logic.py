@@ -50,6 +50,45 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
     print(f"   Has image: {bool(image_context)}")
     print(f"   Clerk User ID: {clerk_user_id}")
 
+    # Check cache (skip if image_context is provided, as it affects generation)
+    if not image_context:
+        try:
+            from services.cache_service import get_cache_service
+            cache_service = get_cache_service()
+            cached_result = cache_service.get_cache(prompt)
+            
+            if cached_result:
+                print(f"✓ Returning cached result for prompt")
+                
+                def cached_event_stream():
+                    """Stream cached result as SSE"""
+                    # Return cached result as completed status
+                    cached_update = {
+                        "status": "completed",
+                        "progress_percentage": 100,
+                        "message": "Video generation completed successfully! (from cache)",
+                        "job_id": cached_result.get("job_id", job_id),
+                        "sections": cached_result.get("sections", []),
+                        "section_details": cached_result.get("section_details", []),
+                        "final_video_url": cached_result.get("final_video_url"),
+                        "metadata": cached_result.get("metadata", {}),
+                        "cached": True
+                    }
+                    yield f"data: {json.dumps(cached_update)}\n\n"
+                
+                return StreamingResponse(
+                    cached_event_stream(),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "X-Accel-Buffering": "no"
+                    }
+                )
+        except Exception as e:
+            # Cache check failed, continue with normal generation
+            print(f"⚠️  Cache check error (continuing with generation): {type(e).__name__}: {e}")
+
     def event_stream():
         """Stream progress updates as SSE"""
         try:
