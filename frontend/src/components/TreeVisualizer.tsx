@@ -173,6 +173,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         const isOnCurrentPath = currentPath.some(n => n.id === node.id);
         const nodeNumber = getNodeNumber(tree, node.id);
         const size = isCurrent ? currentNodeSize : nodeSize;
+        const isQuestionNode = node.segment.isQuestionNode || false;
         
         // Calculate Y position - center the main path, offset branches vertically
         let yPos = centerY;
@@ -182,9 +183,14 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
           yPos = centerY + offset;
         }
         
-        // Color based on branch
+        // Color logic: Question nodes are always yellow, current nodes are blue, others use branch colors
         const colorIndex = node.branchIndex % nodeColors.length;
-        const nodeColor = isCurrent ? '#3b82f6' : nodeColors[colorIndex];
+        let nodeColor = nodeColors[colorIndex];
+        if (isQuestionNode) {
+          nodeColor = '#fbbf24'; // Yellow for question nodes (always)
+        } else if (isCurrent) {
+          nodeColor = '#3b82f6'; // Blue for current video nodes
+        }
         
         nodePositions.set(node.id, { x: xPosition, y: yPos });
         
@@ -200,13 +206,17 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
           position: { x: xPosition, y: yPos },
           style: {
             background: nodeColor,
-            border: isCurrent ? '2px solid #60a5fa' : 'none',
+            border: isQuestionNode 
+              ? '3px solid #f59e0b' 
+              : (isCurrent ? '2px solid #60a5fa' : 'none'),
             borderRadius: '50%',
             width: size,
             height: size,
-            boxShadow: isCurrent ? '0 0 12px rgba(59, 130, 246, 0.6)' : 'none',
+            boxShadow: isQuestionNode 
+              ? '0 0 30px rgba(251, 191, 36, 0.8)' 
+              : (isCurrent ? '0 0 12px rgba(59, 130, 246, 0.6)' : 'none'),
             cursor: 'pointer',
-            opacity: isOnCurrentPath || isCurrent ? 1 : 0.7,
+            opacity: isOnCurrentPath || isCurrent || isQuestionNode ? 1 : 0.7,
           },
           draggable: false,
         });

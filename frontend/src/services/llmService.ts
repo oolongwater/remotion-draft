@@ -141,11 +141,19 @@ export async function generateVideoSegment(
 
 /**
  * Evaluate a user's answer to determine correctness and next steps
+ * Enhanced version that accepts optional context for leaf questions
  */
 export async function evaluateAnswer(
   answer: string,
   question: string,
-  topic: string
+  topic: string,
+  context?: {
+    branchPath?: Array<{
+      nodeNumber: string;
+      topic: string;
+      voiceoverScript?: string;
+    }>;
+  }
 ): Promise<EvaluateAnswerResponse> {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
   
@@ -157,7 +165,7 @@ export async function evaluateAnswer(
   }
   
   try {
-    const prompt = buildEvaluationPrompt(answer, question, topic);
+    const prompt = buildEvaluationPrompt(answer, question, topic, context);
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -382,13 +390,28 @@ Generate the Manim code now:`;
 function buildEvaluationPrompt(
   answer: string,
   question: string,
-  topic: string
+  topic: string,
+  context?: {
+    branchPath?: Array<{
+      nodeNumber: string;
+      topic: string;
+      voiceoverScript?: string;
+    }>;
+  }
 ): string {
+  let contextSection = '';
+  if (context?.branchPath && context.branchPath.length > 0) {
+    const pathContext = context.branchPath
+      .map((node) => `- Node ${node.nodeNumber}: ${node.topic}`)
+      .join('\n');
+    contextSection = `\nLEARNING PATH CONTEXT:\n${pathContext}\n`;
+  }
+
   return `Evaluate this student answer:
 
 QUESTION: ${question}
 TOPIC: ${topic}
-STUDENT ANSWER: ${answer}
+STUDENT ANSWER: ${answer}${contextSection}
 
 Determine:
 1. Is the answer correct/demonstrates understanding?
@@ -622,6 +645,223 @@ export async function generateReflectionQuestions(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Generate a contextual question at leaf nodes based on the branch path
+ */
+export async function generateLeafQuestion(payload: {
+  topic: string;
+  branchPath: Array<{
+    nodeNumber: string;
+    topic: string;
+    voiceoverScript?: string;
+  }>;
+  summary?: string;
+}): Promise<{
+  success: boolean;
+  question?: string;
+  error?: string;
+}> {
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    console.error('VITE_ANTHROPIC_API_KEY not configured');
+    return {
+      success: false,
+      error: 'API key not configured. Please add VITE_ANTHROPIC_API_KEY to your .env file.',
+    };
+  }
+
+  try {
+    // Build context from branch path
+    const pathContext = payload.branchPath
+      .map((node) => {
+        const script = node.voiceoverScript ? `\n  Script: ${node.voiceoverScript}` : '';
+        return `- Node ${node.nodeNumber}: ${node.topic}${script}`;
+      })
+      .join('\n');
+
+    const prompt = `You are an expert instructional designer creating a knowledge check question for a learner who has just completed a video learning path.
+
+LEARNING PATH COMPLETED:
+${pathContext}
+
+${payload.summary ? `SUMMARY:\n${payload.summary}\n` : ''}
+
+Your task is to generate ONE concrete, content-focused question that:
+1. Tests a specific concept, definition, or fact from the lessons covered (e.g., "What property must all nodes in a binary search tree satisfy?")
+2. Has a clear, factual answer based on the material covered in the path
+3. Avoids broad reflection - focus on concrete knowledge from the videos
+4. Can be answered in 1-3 sentences
+5. Is direct and clear (one sentence, max 20 words)
+
+GOOD EXAMPLES:
+- "What is the time complexity for search in a binary search tree?"
+- "What property must a binary search tree maintain?"
+- "How does insertion work in a balanced BST?"
+
+BAD EXAMPLES (too reflective/broad):
+- "How might binary search trees optimize data retrieval in applications you use daily?"
+- "What resonated with you about this lesson?"
+
+RESPONSE FORMAT (JSON only, no markdown):
+{
+  "question": "Your specific, testable question here?"
+}
+
+Generate the leaf question now:`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 512,
+        temperature: 0.6,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Claude API request failed:', response.status, errorData);
+      return {
+        success: false,
+        error: `Claude API request failed: ${response.status} ${response.statusText}. ${errorData.error?.message || ''}`,
+      };
+    }
+
+    const data = await response.json();
+    const textContent = data.content?.[0]?.text;
+
+    if (!textContent) {
+      console.error('No text content in response:', data);
+      return {
+        success: false,
+        error: 'No content received from Claude API',
+      };
+    }
+
+    // Parse the JSON response
+    const cleanedJSON = cleanJSONResponse(textContent);
+    let parsedData: any;
+
+    try {
+      parsedData = JSON.parse(cleanedJSON);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Received text:', textContent);
+      return {
+        success: false,
+        error: 'Failed to parse leaf question JSON from API response',
+      };
+    }
+
+    const question = parsedData.question;
+
+    if (typeof question === 'string' && question.trim()) {
+      return {
+        success: true,
+        question: question.trim(),
+      };
+    }
+
+    return {
+      success: false,
+      error: 'No question found in API response',
+    };
+  } catch (error) {
+    console.error('Leaf question generation error:', error);
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : 'Unknown error occurred during leaf question generation',
+    };
+  }
+}
+
+/**
+ * Generate a remediation video for incorrect answers
+ * Uses Modal backend for video generation
+ */
+export async function generateRemediationVideo(
+  question: string,
+  userAnswer: string,
+  correctExplanation: string,
+  branchContext: string,
+  onProgress?: (progress: any) => void
+): Promise<{
+  success: boolean;
+  videoUrl?: string;
+  segment?: VideoSegment;
+  error?: string;
+}> {
+  try {
+    // Import the video render service dynamically to avoid circular dependencies
+    const { generateVideoScenes } = await import('./videoRenderService');
+    
+    // Build a topic that includes the remediation context
+    const remediationTopic = `Explanation: ${question}
+
+Your answer: "${userAnswer}"
+
+Let me explain: ${correctExplanation}
+
+Context: ${branchContext}`;
+
+    console.log('Generating remediation video with topic:', remediationTopic);
+    
+    const result = await generateVideoScenes(remediationTopic, onProgress);
+    
+    if (result.success && result.sections && result.sections.length > 0) {
+      const videoUrl = result.sections[0]; // Use first section
+      const detail = result.sectionDetails?.[0];
+      
+      const segment: VideoSegment = {
+        id: `remediation_${Date.now()}`,
+        manimCode: '',
+        duration: 90,
+        hasQuestion: false,
+        topic: `Remediation: ${question}`,
+        difficulty: 'medium',
+        generatedAt: new Date().toISOString(),
+        videoUrl: videoUrl,
+        thumbnailUrl: detail?.thumbnail_url,
+        title: `Understanding: ${question}`,
+        renderingStatus: 'completed',
+        voiceoverScript: detail?.voiceover_script,
+        isQuestionNode: false,
+      };
+      
+      return {
+        success: true,
+        videoUrl,
+        segment,
+      };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Failed to generate remediation video',
+      };
+    }
+  } catch (error) {
+    console.error('Remediation video generation error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred during remediation video generation',
     };
   }
 }

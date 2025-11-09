@@ -61,12 +61,16 @@ const ExplorerNode = ({ data }: NodeProps) => {
           <div
             className="relative w-32 h-20 rounded-lg overflow-hidden shadow-lg"
             style={{
-              border: (data as any).isCurrent
-                ? "3px solid #60a5fa"
-                : `2px solid ${(data as any).borderColor || "#3b82f6"}`,
-              boxShadow: (data as any).isCurrent
-                ? "0 0 30px rgba(59, 130, 246, 0.8), 0 4px 6px -1px rgba(0, 0, 0, 0.1)"
-                : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+              border: (data as any).isQuestionNode
+                ? '3px solid #f59e0b'
+                : ((data as any).isCurrent
+                  ? "3px solid #60a5fa"
+                  : `2px solid ${(data as any).borderColor || "#3b82f6"}`),
+              boxShadow: (data as any).isQuestionNode
+                ? '0 0 30px rgba(251, 191, 36, 0.8), 0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                : ((data as any).isCurrent
+                  ? "0 0 30px rgba(59, 130, 246, 0.8), 0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                  : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"),
             }}
           >
             <img
@@ -297,9 +301,17 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
           )
         : false;
 
-      // Color based on branch
+      // Check if this is a question node
+      const isQuestionNode = treeNode.segment.isQuestionNode || false;
+      
+      // Color logic: Question nodes are always yellow, current nodes are blue, others use branch colors
       const colorIndex = treeNode.branchIndex % nodeColors.length;
-      const nodeColor = isCurrent ? "#3b82f6" : nodeColors[colorIndex];
+      let nodeColor = nodeColors[colorIndex];
+      if (isQuestionNode) {
+        nodeColor = '#fbbf24'; // Yellow for question nodes (always)
+      } else if (isCurrent) {
+        nodeColor = '#3b82f6'; // Blue for current video nodes
+      }
 
       // Determine if this node has a thumbnail
       const hasThumbnail = !!(treeNode.segment as any).thumbnailUrl;
@@ -314,8 +326,11 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
           thumbnailUrl: (treeNode.segment as any).thumbnailUrl,
           voiceoverScript: treeNode.segment.voiceoverScript,
           nodeColor: nodeColor,
-          borderColor: isCurrent ? "#60a5fa" : nodeColor,
+          borderColor: isQuestionNode 
+            ? '#f59e0b' 
+            : (isCurrent ? '#60a5fa' : nodeColor),
           isCurrent: isCurrent,
+          isQuestionNode: isQuestionNode,
         },
         position,
         sourcePosition: Position.Right,
@@ -323,7 +338,9 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
         style: {
           background: hasThumbnail ? "transparent" : nodeColor,
           color: "#fff",
-          border: isCurrent && !hasThumbnail ? "3px solid #60a5fa" : "none",
+          border: isQuestionNode && !hasThumbnail
+            ? '3px solid #f59e0b'
+            : (isCurrent && !hasThumbnail ? "3px solid #60a5fa" : "none"),
           borderRadius: hasThumbnail ? "0" : "50%",
           padding: "0",
           width: hasThumbnail ? "auto" : "40px",
@@ -331,15 +348,16 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow:
-            isCurrent && !hasThumbnail
+          boxShadow: isQuestionNode && !hasThumbnail
+            ? '0 0 30px rgba(251, 191, 36, 0.8)'
+            : (isCurrent && !hasThumbnail
               ? "0 0 30px rgba(59, 130, 246, 0.8)"
               : !hasThumbnail
               ? "0 2px 8px rgba(0, 0, 0, 0.3)"
-              : "none",
+              : "none"),
           cursor: "pointer",
           transition: "all 0.2s ease",
-          opacity: isOnCurrentPath || isCurrent ? 1 : 0.7,
+          opacity: isOnCurrentPath || isCurrent || isQuestionNode ? 1 : 0.7,
         },
         draggable: true,
       };

@@ -25,12 +25,17 @@ import {
   saveVideoSession,
   getChildren,
   getNodeNumber,
+  isLeafNode,
+  getPathFromRoot,
 } from '../types/TreeState';
 import {
   evaluateAnswer,
+  generateLeafQuestion,
+  generateRemediationVideo,
 } from '../services/llmService';
 import { generateVideoScenes, GenerationProgress, SectionDetail } from '../services/videoRenderService';
 import { analyzeQuestion } from '../services/questionAnalysisService';
+import { generateQuizQuestion, evaluateQuizAnswer } from '../services/quizService';
 
 /**
  * Props for VideoController render function
@@ -55,12 +60,28 @@ export interface VideoControllerState {
   // Generation progress (for SSE updates)
   generationProgress?: GenerationProgress;
   
+  // Quiz state
+  showQuiz: boolean;
+  quizQuestion: string | null;
+  quizResult: 'correct' | 'incorrect' | null;
+  isGeneratingQuiz: boolean;
+  
   // Actions
   handleAnswer: (answer: string) => Promise<void>;
   requestNextSegment: () => Promise<void>;
   requestNewTopic: (topic: string) => Promise<void>;
   navigateToNode: (nodeId: string) => void;
   handleQuestionBranch: (question: string) => Promise<void>;
+  handleQuizAnswer: (answer: string) => Promise<void>;
+  triggerQuizQuestion: () => Promise<void>;
+  closeQuiz: () => void;
+  createQuestionNode: (leafNodeId: string) => Promise<void>;
+  handleLeafQuestionAnswer: (question: string, answer: string) => Promise<{
+    success: boolean;
+    correct?: boolean;
+    reasoning?: string;
+    error?: string;
+  }>;
   
   // Legacy - kept for backward compatibility
   goToSegment: (index: number) => void;
@@ -161,6 +182,13 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   
   // Generation progress
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | undefined>();
+  
+  // Quiz state
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizQuestion, setQuizQuestion] = useState<string | null>(null);
+  const [quizCorrectAnswer, setQuizCorrectAnswer] = useState<string | null>(null);
+  const [quizResult, setQuizResult] = useState<'correct' | 'incorrect' | null>(null);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   
   // Get current segment from tree
   const currentNode = getCurrentNode(session.tree);
@@ -660,6 +688,405 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   }, [currentNode, currentSegment, session, onError]);
   
   /**
+   * Generate and show quiz question for leaf nodes
+   */
+  const triggerQuizQuestion = useCallback(async () => {
+    if (!currentNode || !currentSegment) {
+      console.warn('No current node for quiz');
+      return;
+    }
+    
+    // Check if current node is a leaf
+    if (!isLeafNode(session.tree, currentNode.id)) {
+      console.log('Not a leaf node, skipping quiz');
+      return;
+    }
+    
+    setIsGeneratingQuiz(true);
+    setShowQuiz(true);
+    setQuizResult(null);
+    setError(null);
+    
+    try {
+      console.log('Generating quiz question for:', currentSegment.topic);
+      const result = await generateQuizQuestion(
+        currentSegment.topic,
+        currentSegment.voiceoverScript
+      );
+      
+      if (result.success && result.question) {
+        setQuizQuestion(result.question);
+        setQuizCorrectAnswer(result.correctAnswer || null);
+      } else {
+        setError(result.error || 'Failed to generate quiz question');
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMsg);
+      onError?.(errorMsg);
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  }, [currentNode, currentSegment, session, onError]);
+  
+  /**
+   * Handle user's quiz answer
+   */
+  const handleQuizAnswer = useCallback(async (answer: string) => {
+    if (!quizQuestion || !currentSegment || !currentNode) {
+      console.warn('No quiz question or current segment');
+      return;
+    }
+    
+    setIsEvaluating(true);
+    setError(null);
+    
+    try {
+      console.log('Evaluating quiz answer:', answer);
+      const result = await evaluateQuizAnswer(
+        answer,
+        quizQuestion,
+        currentSegment.topic,
+        quizCorrectAnswer || undefined
+      );
+      
+      if (!result.success) {
+        setError(result.error || 'Failed to evaluate answer');
+        setIsEvaluating(false);
+        return;
+      }
+      
+      const { correct, explanation } = result;
+      
+      if (correct) {
+        // Show congratulations
+        setQuizResult('correct');
+        setIsEvaluating(false);
+      } else {
+        // Generate explanation video for wrong answer
+        setQuizResult('incorrect');
+        setIsEvaluating(false);
+        
+        // Generate a new video explaining the correct answer
+        setIsGenerating(true);
+        setGenerationProgress(undefined);
+        
+        try {
+          const explanationTopic = `${currentSegment.topic} - Correct Answer Explanation: ${explanation}`;
+          
+          const videoResult = await generateVideoScenes(explanationTopic, (progress) => {
+            setGenerationProgress(progress);
+          });
+          
+          if (videoResult.success && videoResult.sections && videoResult.sections.length > 0) {
+            const videoUrl = videoResult.sections[0];
+            const detail = videoResult.sectionDetails?.[0];
+            
+            const explanationSegment: VideoSegment = {
+              id: `explanation_${Date.now()}`,
+              manimCode: '',
+              duration: 90,
+              hasQuestion: false,
+              topic: `Explanation: ${currentSegment.topic}`,
+              difficulty: 'medium',
+              generatedAt: new Date().toISOString(),
+              videoUrl: videoUrl,
+              thumbnailUrl: detail?.thumbnail_url,
+              title: `Correct Answer: ${currentSegment.topic}`,
+              renderingStatus: 'completed',
+              voiceoverScript: detail?.voiceover_script,
+            };
+            
+            // Add explanation as child node
+            const explanationNode = addChildNode(
+              session.tree,
+              currentNode.id,
+              explanationSegment,
+              'Explanation'
+            );
+            
+            setSession((prev) => ({
+              ...prev,
+              lastUpdatedAt: new Date().toISOString(),
+            }));
+            
+            saveLearningTree(session.sessionId, session.tree);
+            
+            // Navigate to explanation video
+            navigateToNodeHelper(session.tree, explanationNode.id);
+            
+            // Close quiz overlay
+            setShowQuiz(false);
+            setQuizQuestion(null);
+            setQuizResult(null);
+            
+            console.log('Generated explanation video and navigated to it');
+          } else {
+            setError(videoResult.error || 'Failed to generate explanation video');
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error generating explanation';
+          setError(errorMsg);
+          onError?.(errorMsg);
+        } finally {
+          setIsGenerating(false);
+          setGenerationProgress(undefined);
+        }
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMsg);
+      onError?.(errorMsg);
+      setIsEvaluating(false);
+    }
+  }, [quizQuestion, quizCorrectAnswer, currentSegment, currentNode, session, onError]);
+  
+  /**
+   * Close quiz overlay
+   */
+  const closeQuiz = useCallback(() => {
+    setShowQuiz(false);
+    setQuizQuestion(null);
+    setQuizResult(null);
+    setQuizCorrectAnswer(null);
+    setError(null);
+  }, []);
+  
+  /**
+   * Create a question node at a leaf
+   * Generates a contextual question based on the branch path and adds it as a child
+   */
+  const createQuestionNode = useCallback(async (leafNodeId: string) => {
+    try {
+      const leafNode = session.tree.nodes.get(leafNodeId);
+      if (!leafNode) {
+        console.error('Leaf node not found:', leafNodeId);
+        return;
+      }
+      
+      // Check if already has a question node child
+      const children = getChildren(session.tree, leafNodeId);
+      const hasQuestionNode = children.some(child => child.segment.isQuestionNode);
+      if (hasQuestionNode) {
+        console.log('Question node already exists for this leaf');
+        return;
+      }
+      
+      setIsGenerating(true);
+      setError(null);
+      
+      // Build branch path for context
+      const pathNodes = getPathFromRoot(session.tree, leafNodeId);
+      const branchPath = pathNodes.map(node => ({
+        nodeNumber: getNodeNumber(session.tree, node.id),
+        topic: node.segment.topic,
+        voiceoverScript: node.segment.voiceoverScript,
+      }));
+      
+      const summary = session.context.historyTopics.join(' → ');
+      
+      console.log('Generating leaf question for node:', leafNodeId);
+      const result = await generateLeafQuestion({
+        topic: leafNode.segment.topic,
+        branchPath,
+        summary,
+      });
+      
+      if (!result.success || !result.question) {
+        const errorMsg = result.error || 'Failed to generate leaf question';
+        setError(errorMsg);
+        onError?.(errorMsg);
+        setIsGenerating(false);
+        return;
+      }
+      
+      // Create question-only segment with duration 0
+      const questionSegment: VideoSegment = {
+        id: `question_${Date.now()}`,
+        manimCode: '',
+        duration: 0,
+        hasQuestion: false,
+        questionText: result.question,
+        topic: `Question: ${leafNode.segment.topic}`,
+        difficulty: 'medium',
+        generatedAt: new Date().toISOString(),
+        isQuestionNode: true, // Mark as question node
+        title: 'Knowledge Check',
+      };
+      
+      // Add as child of leaf node
+      const questionNode = addChildNode(session.tree, leafNodeId, questionSegment, 'Question');
+      
+      // Navigate to question node
+      navigateToNodeHelper(session.tree, questionNode.id);
+      
+      const updatedSession = {
+        ...session,
+        lastUpdatedAt: new Date().toISOString(),
+      };
+      
+      setSession(updatedSession);
+      saveVideoSession(updatedSession);
+      
+      console.log('Question node created and navigated to:', questionNode.id);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error creating question node';
+      setError(errorMsg);
+      onError?.(errorMsg);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [session, onError]);
+  
+  /**
+   * Handle answer to a leaf question
+   * Evaluates with LLM and generates remediation video if incorrect
+   */
+  const handleLeafQuestionAnswer = useCallback(async (
+    question: string,
+    answer: string
+  ): Promise<{
+    success: boolean;
+    correct?: boolean;
+    reasoning?: string;
+    error?: string;
+  }> => {
+    if (!currentNode) {
+      return {
+        success: false,
+        error: 'No current node',
+      };
+    }
+    
+    setIsEvaluating(true);
+    setError(null);
+    
+    try {
+      // Build context for evaluation
+      const pathNodes = getPathFromRoot(session.tree, currentNode.id);
+      const branchPath = pathNodes.map(node => ({
+        nodeNumber: getNodeNumber(session.tree, node.id),
+        topic: node.segment.topic,
+        voiceoverScript: node.segment.voiceoverScript,
+      }));
+      
+      console.log('Evaluating leaf question answer:', answer);
+      const evalResult = await evaluateAnswer(
+        answer,
+        question,
+        currentNode.segment.topic,
+        { branchPath }
+      );
+      
+      if (!evalResult.success) {
+        const errorMsg = evalResult.error || 'Failed to evaluate answer';
+        setError(errorMsg);
+        setIsEvaluating(false);
+        return {
+          success: false,
+          error: errorMsg,
+        };
+      }
+      
+      const { correct, reasoning } = evalResult;
+      
+      // Update correctness pattern in context
+      const newPattern = [
+        ...(session.context.correctnessPattern || []),
+        correct || false,
+      ].slice(-5);
+      
+      const updatedContext = updateContext(session.context, {
+        correctnessPattern: newPattern,
+        userAnswer: answer,
+        wasCorrect: correct,
+      });
+      
+      // Store answer on current node
+      currentNode.segment.userAnswer = answer;
+      
+      const updatedSession = {
+        ...session,
+        context: updatedContext,
+        lastUpdatedAt: new Date().toISOString(),
+      };
+      
+      setSession(updatedSession);
+      saveVideoSession(updatedSession);
+      
+      setIsEvaluating(false);
+      
+      // If INCORRECT: Generate remediation video
+      if (!correct) {
+        console.log('Answer incorrect, generating remediation video');
+        setIsGenerating(true);
+        setGenerationProgress(undefined);
+        
+        try {
+          const branchContext = branchPath
+            .map(node => `${node.nodeNumber}: ${node.topic}`)
+            .join(' → ');
+          
+          const remediationResult = await generateRemediationVideo(
+            question,
+            answer,
+            reasoning || 'Let me explain the correct approach.',
+            branchContext,
+            (progress) => setGenerationProgress(progress)
+          );
+          
+          if (remediationResult.success && remediationResult.segment) {
+            // Add remediation video as child node
+            const remediationNode = addChildNode(
+              session.tree,
+              currentNode.id,
+              remediationResult.segment,
+              'Explanation'
+            );
+            
+            // Navigate to remediation video
+            navigateToNodeHelper(session.tree, remediationNode.id);
+            
+            const finalSession = {
+              ...updatedSession,
+              lastUpdatedAt: new Date().toISOString(),
+            };
+            
+            setSession(finalSession);
+            saveVideoSession(finalSession);
+            
+            console.log('Remediation video generated and navigated to');
+          } else {
+            setError(remediationResult.error || 'Failed to generate remediation video');
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error generating remediation';
+          setError(errorMsg);
+          onError?.(errorMsg);
+        } finally {
+          setIsGenerating(false);
+          setGenerationProgress(undefined);
+        }
+      }
+      
+      return {
+        success: true,
+        correct,
+        reasoning,
+      };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error evaluating answer';
+      setError(errorMsg);
+      onError?.(errorMsg);
+      setIsEvaluating(false);
+      return {
+        success: false,
+        error: errorMsg,
+      };
+    }
+  }, [currentNode, session, onError]);
+  
+  /**
    * Navigate to a specific segment by index (legacy compatibility)
    * @deprecated Use navigateToNode instead
    */
@@ -678,11 +1105,20 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     isEvaluating,
     error,
     generationProgress,
+    showQuiz,
+    quizQuestion,
+    quizResult,
+    isGeneratingQuiz,
     handleAnswer,
     requestNextSegment,
     requestNewTopic,
     navigateToNode,
     handleQuestionBranch,
+    handleQuizAnswer,
+    triggerQuizQuestion,
+    closeQuiz,
+    createQuestionNode,
+    handleLeafQuestionAnswer,
     goToSegment,
   };
   

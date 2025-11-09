@@ -12,7 +12,9 @@ import { ClosingQuestionOverlay } from "./components/ClosingQuestionOverlay";
 import { ErrorDisplay } from "./components/ErrorDisplay";
 import { InputOverlay } from "./components/InputOverlay";
 import { LandingPage } from "./components/LandingPage";
+import { LeafQuestionOverlay } from "./components/LeafQuestionOverlay";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+import { QuizQuestionOverlay } from "./components/QuizQuestionOverlay";
 import { TreeExplorer } from "./components/TreeExplorer";
 import { TreeVisualizer } from "./components/TreeVisualizer";
 import { VideoController } from "./controllers/VideoController";
@@ -23,6 +25,7 @@ import {
   getNextNode,
   getPreviousNode,
   loadVideoSession,
+  clearVideoSession,
 } from "./types/TreeState";
 import { ClosingQuestionPayload, VideoSession } from "./types/VideoConfig";
 
@@ -67,6 +70,21 @@ export const App: React.FC = () => {
     closingPayloadRef.current = null;
   }, []);
 
+  // Leaf question state
+  const [leafQuestion, setLeafQuestion] = useState<string | null>(null);
+  const [leafQuestionStatus, setLeafQuestionStatus] = useState<
+    "idle" | "loading" | "ready" | "evaluating" | "correct" | "incorrect" | "error"
+  >("idle");
+  const [leafQuestionAnswer, setLeafQuestionAnswer] = useState<string>("");
+  const [leafEvaluationReasoning, setLeafEvaluationReasoning] = useState<string>("");
+
+  const resetLeafQuestionState = useCallback(() => {
+    setLeafQuestion(null);
+    setLeafQuestionStatus("idle");
+    setLeafQuestionAnswer("");
+    setLeafEvaluationReasoning("");
+  }, []);
+
   // ===== TEST MODE - EASILY REMOVABLE =====
   const [isTestMode, setIsTestMode] = useState(false);
   // ===== END TEST MODE =====
@@ -76,6 +94,9 @@ export const App: React.FC = () => {
 
   // Auto-play toggle state (on by default)
   const [isAutoPlayEnabled, setIsAutoPlayEnabled] = useState(true);
+
+  // Track if user has seen a video (to prevent question overlay on initial mount)
+  const [hasSeenFirstVideo, setHasSeenFirstVideo] = useState(false);
 
   /**
    * Check for cached session on mount
@@ -116,6 +137,10 @@ export const App: React.FC = () => {
    */
   const handleTopicSubmit = async (topic: string) => {
     resetClosingQuestionState();
+    resetLeafQuestionState();
+    setHasSeenFirstVideo(false); // Reset video tracking for new session
+    clearVideoSession(); // Clear localStorage to force fresh generation
+    setCachedSession(null); // Clear any cached session to force new generation
     setCurrentTopic(topic);
     setIsTestMode(false); // Normal mode
     setAppState("learning");
@@ -161,6 +186,10 @@ export const App: React.FC = () => {
    */
   const handleReset = () => {
     resetClosingQuestionState();
+    resetLeafQuestionState();
+    setHasSeenFirstVideo(false); // Reset video tracking
+    clearVideoSession(); // Clear localStorage
+    setCachedSession(null); // Clear cached session
     setAppState("landing");
     setCurrentTopic("");
     setError("");
@@ -333,6 +362,16 @@ export const App: React.FC = () => {
             requestNewTopic,
             navigateToNode,
             handleQuestionBranch,
+            showQuiz,
+            quizQuestion,
+            quizResult,
+            isGeneratingQuiz,
+            isEvaluating,
+            handleQuizAnswer,
+            triggerQuizQuestion,
+            closeQuiz,
+            createQuestionNode,
+            handleLeafQuestionAnswer,
             goToSegment,
           }) => {
             // Check if current node is a leaf (no children) - this means it's the last segment
@@ -357,9 +396,14 @@ export const App: React.FC = () => {
                 return;
               }
 
-              if (isLastSegment) {
-                requestClosingQuestion(session);
-              } else if (isAutoPlayEnabled) {
+              // Check if this is a leaf node AND not already a question node
+              // Also ensure we've actually played the video (not just mounted on a leaf node)
+              if (isLastSegment && !currentSegment.isQuestionNode && hasSeenFirstVideo) {
+                // Leaf video detected - create question node
+                console.log('Leaf video ended, creating question node');
+                createQuestionNode(session.tree.currentNodeId);
+              } else if (isAutoPlayEnabled && !currentSegment.isQuestionNode) {
+                // Auto-advance to next node (only for video nodes, not question nodes)
                 const nextNode = getNextNode(
                   session.tree,
                   session.tree.currentNodeId
@@ -372,10 +416,11 @@ export const App: React.FC = () => {
               currentSegment,
               isGenerating,
               isLastSegment,
-              requestClosingQuestion,
+              createQuestionNode,
               session,
               isAutoPlayEnabled,
               navigateToNode,
+              hasSeenFirstVideo,
             ]);
 
             // IMPORTANT: Call all hooks BEFORE any conditional returns
@@ -439,6 +484,29 @@ export const App: React.FC = () => {
               };
             }, [session.tree, session.tree.currentNodeId]);
 
+            // Auto-open leaf question overlay when navigating to a question node
+            // But NOT on initial mount - only when we actually navigate to a question node
+            useEffect(() => {
+              // Mark that we've seen a video segment (not on question nodes)
+              if (currentSegment && !currentSegment.isQuestionNode) {
+                setHasSeenFirstVideo(true);
+              }
+            }, [currentSegment?.id, currentSegment?.isQuestionNode]);
+            
+            useEffect(() => {
+              if (currentSegment?.isQuestionNode && leafQuestionStatus === "idle" && hasSeenFirstVideo) {
+                // Extract the question from the segment
+                if (currentSegment.questionText) {
+                  setLeafQuestion(currentSegment.questionText);
+                  setLeafQuestionStatus("ready");
+                  console.log("Auto-opening leaf question overlay");
+                }
+              } else if (!currentSegment?.isQuestionNode && leafQuestionStatus !== "idle") {
+                // Reset state when leaving question node
+                resetLeafQuestionState();
+              }
+            }, [currentSegment?.id, currentSegment?.isQuestionNode, currentSegment?.questionText, leafQuestionStatus, resetLeafQuestionState, hasSeenFirstVideo]);
+
             // NOW we can do conditional returns
 
             // Show loading spinner while generating first segment
@@ -475,6 +543,61 @@ export const App: React.FC = () => {
 
             return (
               <>
+                {/* Quiz Question Overlay */}
+                <QuizQuestionOverlay
+                  isOpen={showQuiz}
+                  question={quizQuestion || ''}
+                  isLoading={isGeneratingQuiz}
+                  isEvaluating={isEvaluating}
+                  error={videoError || undefined}
+                  result={quizResult}
+                  onSubmitAnswer={handleQuizAnswer}
+                  onContinue={closeQuiz}
+                  onRestart={handleReset}
+                />
+
+                {/* Leaf Question Overlay */}
+                <LeafQuestionOverlay
+                  isOpen={leafQuestionStatus !== 'idle'}
+                  question={leafQuestion || undefined}
+                  status={leafQuestionStatus}
+                  answer={leafQuestionAnswer}
+                  reasoning={leafEvaluationReasoning}
+                  error={videoError || undefined}
+                  onAnswerChange={setLeafQuestionAnswer}
+                  onSubmit={async (ans) => {
+                    if (!leafQuestion) return;
+                    setLeafQuestionStatus('evaluating');
+                    const result = await handleLeafQuestionAnswer(leafQuestion, ans);
+                    if (result.success) {
+                      if (result.correct) {
+                        setLeafQuestionStatus('correct');
+                        setLeafEvaluationReasoning(result.reasoning || '');
+                      } else {
+                        setLeafQuestionStatus('incorrect');
+                        setLeafEvaluationReasoning(result.reasoning || '');
+                      }
+                    } else {
+                      setLeafQuestionStatus('error');
+                    }
+                  }}
+                  onContinue={() => {
+                    resetLeafQuestionState();
+                    // If on question node, try to navigate to next or show message
+                    if (currentSegment?.isQuestionNode) {
+                      const nextNode = getNextNode(session.tree, session.tree.currentNodeId);
+                      if (nextNode) {
+                        navigateToNode(nextNode.id);
+                      }
+                    }
+                  }}
+                  onRetry={() => {
+                    setLeafQuestionStatus('ready');
+                    setLeafQuestionAnswer('');
+                  }}
+                  onStartOver={handleReset}
+                />
+
                 {/* Left Sidebar */}
                 <div className="w-80 h-screen bg-slate-800 border-r border-slate-700 flex flex-col">
                   {/* Sidebar Header */}
@@ -576,7 +699,22 @@ export const App: React.FC = () => {
                     className="relative shadow-2xl rounded-lg overflow-hidden bg-black"
                     style={{ width: "calc(100vw - 400px)", maxWidth: "1280px" }}
                   >
-                    {currentSegment.videoUrl ? (
+                    {currentSegment.isQuestionNode ? (
+                      <div
+                        className="flex items-center justify-center bg-gradient-to-br from-yellow-900/30 to-slate-900"
+                        style={{ width: "100%", height: "450px" }}
+                      >
+                        <div className="text-center text-white px-8">
+                          <div className="text-6xl mb-4">❓</div>
+                          <div className="text-2xl mb-2 font-semibold text-yellow-400">
+                            Knowledge Check
+                          </div>
+                          <div className="text-lg text-slate-300">
+                            Answer the question below to continue your learning journey
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentSegment.videoUrl ? (
                       <video
                         key={segmentKey}
                         ref={videoRef}

@@ -429,3 +429,15 @@ export function loadVideoSession(): VideoSession | null {
   }
 }
 
+/**
+ * Clear video session from localStorage
+ */
+export function clearVideoSession(): void {
+  try {
+    localStorage.removeItem('current_video_session');
+    console.log('Session cleared from localStorage');
+  } catch (error) {
+    console.error('Failed to clear session from localStorage:', error);
+  }
+}
+
