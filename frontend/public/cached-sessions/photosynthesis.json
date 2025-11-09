@@ -1,0 +1,145 @@
+{
+  "tree": {
+    "nodes": [
+      [
+        "node_1762663958503_gxgpy4l91",
+        {
+          "id": "node_1762663958503_gxgpy4l91",
+          "segment": {
+            "id": "segment_1",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "How Do Plants Make Their Food?",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:52:38.503Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_1.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_1_thumbnail.png",
+            "title": "How Do Plants Make Their Food?",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Have you ever wondered how plants make their own food? Plants use sunlight to create energy through an amazing process. This process is called photosynthesis, and it's essential for life on Earth."
+          },
+          "parentId": null,
+          "childIds": [
+            "node_1762663958503_i2akbzimm"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663958503_i2akbzimm",
+        {
+          "id": "node_1762663958503_i2akbzimm",
+          "segment": {
+            "id": "segment_2",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "The Three Essential Ingredients for Photosynthesis",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:52:38.503Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_2.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_2_thumbnail.png",
+            "title": "The Three Essential Ingredients for Photosynthesis",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Photosynthesis requires three essential ingredients to create food for plants. First, sunlight provides the energy. Second, carbon dioxide from the air. And third, water absorbed from the soil through the roots. These three ingredients combine in the plant to create glucose and oxygen."
+          },
+          "parentId": "node_1762663958503_gxgpy4l91",
+          "childIds": [
+            "node_1762663958503_w6o7vy16t"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663958503_w6o7vy16t",
+        {
+          "id": "node_1762663958503_w6o7vy16t",
+          "segment": {
+            "id": "segment_3",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Inside the Chloroplast: Where Sunlight Becomes Food",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:52:38.503Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_3.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_3_thumbnail.png",
+            "title": "Inside the Chloroplast: Where Sunlight Becomes Food",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's zoom into a leaf cell and explore the chloroplast, where photosynthesis happens. Chlorophyll molecules capture sunlight energy. The light-dependent reactions convert carbon dioxide and water into glucose and oxygen. These molecules transform into glucose, which stores energy, and oxygen, which is released. This remarkable process powers nearly all life on Earth."
+          },
+          "parentId": "node_1762663958503_i2akbzimm",
+          "childIds": [
+            "node_1762663958503_0x6nl0rnc"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663958503_0x6nl0rnc",
+        {
+          "id": "node_1762663958503_0x6nl0rnc",
+          "segment": {
+            "id": "segment_4",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Why Photosynthesis Powers All Life on Earth",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:52:38.503Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_4.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_4_thumbnail.png",
+            "title": "Why Photosynthesis Powers All Life on Earth",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Photosynthesis is the foundation of life on Earth. Plants release oxygen and create glucose for growth. This connects the entire ecosystem. Plants feed animals and provide oxygen for all life. Without photosynthesis, life as we know it couldn't exist."
+          },
+          "parentId": "node_1762663958503_w6o7vy16t",
+          "childIds": [
+            "node_1762663958503_u8qeoa2er"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663958503_u8qeoa2er",
+        {
+          "id": "node_1762663958503_u8qeoa2er",
+          "segment": {
+            "id": "segment_5",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "From Sunlight to Life: A Recap",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:52:38.503Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_5.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/d959c038-0431-4601-82a3-32eefb2c1d91/section_5_thumbnail.png",
+            "title": "From Sunlight to Life: A Recap",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's recap what we've learned about photosynthesis. Plants capture sunlight and convert carbon dioxide and water into glucose and oxygen. This remarkable process is the foundation of life on Earth. Photosynthesis: Nature's way of turning sunlight into life!"
+          },
+          "parentId": "node_1762663958503_0x6nl0rnc",
+          "childIds": [],
+          "branchIndex": 0
+        }
+      ]
+    ],
+    "rootIds": [
+      "node_1762663958503_gxgpy4l91"
+    ],
+    "currentNodeId": "node_1762663958503_gxgpy4l91"
+  },
+  "context": {
+    "initialTopic": "Photosynthesis",
+    "historyTopics": [
+      "Photosynthesis"
+    ],
+    "depth": 5,
+    "correctnessPattern": [],
+    "preferredStyle": "mixed"
+  },
+  "sessionId": "cached_1762663958503",
+  "startedAt": "2025-11-09T04:52:38.503Z",
+  "lastUpdatedAt": "2025-11-09T04:52:38.503Z"
+}

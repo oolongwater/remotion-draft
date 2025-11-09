@@ -1,0 +1,145 @@
+{
+  "tree": {
+    "nodes": [
+      [
+        "node_1762663868196_u4zpk7oxx",
+        {
+          "id": "node_1762663868196_u4zpk7oxx",
+          "segment": {
+            "id": "segment_1",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "What Are Data Structures and Why Care",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:51:08.192Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_1.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_1_thumbnail.png",
+            "title": "What Are Data Structures and Why Care",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Binary Search Trees are a fundamental data structure in computer science. They're used everywhere: from dictionaries and databases to search engines and file systems. In this video, we'll explore how Binary Search Trees organize data efficiently for fast searching and sorting."
+          },
+          "parentId": null,
+          "childIds": [
+            "node_1762663868196_wu81531zt"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663868196_wu81531zt",
+        {
+          "id": "node_1762663868196_wu81531zt",
+          "segment": {
+            "id": "segment_2",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Understanding Binary Search Tree Fundamentals",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:51:08.196Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_2.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_2_thumbnail.png",
+            "title": "Understanding Binary Search Tree Fundamentals",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's explore Binary Search Trees, or BSTs. A BST is a tree structure where each node contains a value. The key rule is: left children are smaller than the parent, and right children are larger. So three is less than eight, and ten is greater than eight. This rule applies recursively to every subtree. Each node follows the same pattern. One is less than three, which is less than six. The same ordering rule everywhere! This recursive structure makes BSTs powerful for efficient searching and sorting."
+          },
+          "parentId": "node_1762663868196_u4zpk7oxx",
+          "childIds": [
+            "node_1762663868196_40uxdedo1"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663868196_40uxdedo1",
+        {
+          "id": "node_1762663868196_40uxdedo1",
+          "segment": {
+            "id": "segment_3",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Building Your First Binary Search Tree",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:51:08.196Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_3.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_3_thumbnail.png",
+            "title": "Building Your First Binary Search Tree",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's build a Binary Search Tree by inserting values one by one. We start by inserting 50 as the root of our tree. Next, 30. We compare with 50. Since 30 is less than 50, it goes to the left. Now 70. It's greater than 50, so it goes to the right. Insert 20. Compare with 50, go left. Compare with 30, go left again. Insert 40. Less than 50, go left. Greater than 30, go right. Finally, 60 goes left of 70, and 80 goes right of 70. Our Binary Search Tree is complete! Notice how smaller values are always on the left, and larger values on the right at each node."
+          },
+          "parentId": "node_1762663868196_wu81531zt",
+          "childIds": [
+            "node_1762663868196_0x25pqni7"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663868196_0x25pqni7",
+        {
+          "id": "node_1762663868196_0x25pqni7",
+          "segment": {
+            "id": "segment_4",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Finding Value 4: Search Path Visualization",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:51:08.196Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_4.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_4_thumbnail.png",
+            "title": "Finding Value 4: Search Path Visualization",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's search for the value 4 in this binary search tree. We'll start at the root and follow the path. First, we compare 4 with the root node 8. Since 4 is less than 8, we go left. Next, we compare 4 with 3. Since 4 is greater than 3, we go right. Now we compare 4 with 6. Since 4 is less than 6, we go left. Finally, we compare 4 with 4. We found it! The search took only 3 comparisons."
+          },
+          "parentId": "node_1762663868196_40uxdedo1",
+          "childIds": [
+            "node_1762663868196_4d1hk09s9"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663868196_4d1hk09s9",
+        {
+          "id": "node_1762663868196_4d1hk09s9",
+          "segment": {
+            "id": "segment_5",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "BST Recap and What's Coming Next",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:51:08.196Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_5.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/97033986-b5b2-4654-b0a4-a1b3372a51b1/section_5_thumbnail.png",
+            "title": "BST Recap and What's Coming Next",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's recap what makes Binary Search Trees so powerful. Remember: left children are smaller, right children are larger. BSTs offer logarithmic search time and efficient operations. But watch out for unbalanced trees, which can degrade performance. Next, we'll explore AVL trees, which automatically stay balanced."
+          },
+          "parentId": "node_1762663868196_0x25pqni7",
+          "childIds": [],
+          "branchIndex": 0
+        }
+      ]
+    ],
+    "rootIds": [
+      "node_1762663868196_u4zpk7oxx"
+    ],
+    "currentNodeId": "node_1762663868196_u4zpk7oxx"
+  },
+  "context": {
+    "initialTopic": "Binary Search Trees",
+    "historyTopics": [
+      "Binary Search Trees"
+    ],
+    "depth": 5,
+    "correctnessPattern": [],
+    "preferredStyle": "mixed"
+  },
+  "sessionId": "cached_1762663868196",
+  "startedAt": "2025-11-09T04:51:08.196Z",
+  "lastUpdatedAt": "2025-11-09T04:51:08.196Z"
+}

@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { hasCachedSession } from '../services/cachedSessionService';
 
 interface LandingPageProps {
   onSubmit: (topic: string) => void;
@@ -24,16 +25,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }
   
   // Example topics for inspiration
   const exampleTopics = [
-    'React Hooks',
     'Binary Search Trees',
     'Photosynthesis',
-    'Quantum Computing',
-    'Shakespeare\'s Sonnets',
-    'Machine Learning',
+    'Pythagoras Theorem',
   ];
   
   const handleExampleClick = (exampleTopic: string) => {
-    setTopic(exampleTopic);
+    // Directly submit if cached, otherwise set input value
+    if (hasCachedSession(exampleTopic)) {
+      onSubmit(exampleTopic);
+    } else {
+      setTopic(exampleTopic);
+    }
   };
   
   return (
@@ -90,15 +93,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }
         <div className="animate-fade-in" style={{ animationDelay: '0.8s' }}>
           <p className="text-slate-500 text-sm mb-4 text-center">Or try one of these:</p>
           <div className="flex flex-wrap justify-center gap-3">
-            {exampleTopics.map((example) => (
-              <button
-                key={example}
-                onClick={() => handleExampleClick(example)}
-                className="px-4 py-2 bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white rounded-lg text-sm transition-all duration-200 border border-slate-700 hover:border-blue-500/50 backdrop-blur-sm"
-              >
-                {example}
-              </button>
-            ))}
+            {exampleTopics.map((example) => {
+              const isCached = hasCachedSession(example);
+              return (
+                <button
+                  key={example}
+                  onClick={() => handleExampleClick(example)}
+                  className={`px-4 py-2 rounded-lg text-sm transition-all duration-200 backdrop-blur-sm relative group ${
+                    isCached
+                      ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 text-blue-300 hover:text-blue-200 border border-blue-500/50 hover:border-blue-400/70'
+                      : 'bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700 hover:border-blue-500/50'
+                  }`}
+                  title={isCached ? 'Instant playback - Pre-loaded' : 'Will generate on demand'}
+                >
+                  {isCached && (
+                    <span className="inline-block mr-1.5 text-blue-400">
+                      ⚡
+                    </span>
+                  )}
+                  {example}
+                </button>
+              );
+            })}
           </div>
           
           {/* ===== TEST BUTTON - EASILY REMOVABLE ===== */}

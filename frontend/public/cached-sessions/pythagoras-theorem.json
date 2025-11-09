@@ -1,0 +1,145 @@
+{
+  "tree": {
+    "nodes": [
+      [
+        "node_1762663576316_zuyi6qwch",
+        {
+          "id": "node_1762663576316_zuyi6qwch",
+          "segment": {
+            "id": "segment_1",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Finding Missing Lengths With Pythagoras Theorem",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:46:16.316Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_1.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_1_thumbnail.png",
+            "title": "Finding Missing Lengths With Pythagoras Theorem",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's explore one of the most famous theorems in mathematics: the Pythagorean Theorem. Imagine a ladder leaning against a wall, forming a right triangle. We know the ladder is 5 meters long, and the base is 4 meters from the wall. But how can we find the height of the wall? This is where the Pythagorean Theorem comes to our rescue! The Pythagorean Theorem states that in a right triangle, the square of the hypotenuse equals the sum of squares of the other two sides."
+          },
+          "parentId": null,
+          "childIds": [
+            "node_1762663576316_kotxqs9kg"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663576316_kotxqs9kg",
+        {
+          "id": "node_1762663576316_kotxqs9kg",
+          "segment": {
+            "id": "segment_2",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Visualizing the Pythagorean Theorem with Squares",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:46:16.316Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_2.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_2_thumbnail.png",
+            "title": "Visualizing the Pythagorean Theorem with Squares",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's explore one of the most famous theorems in mathematics: the Pythagorean Theorem. We start with a right triangle, with sides labeled a, b, and c, where c is the hypotenuse. Now, let's construct a square on each side of the triangle. The areas of these squares reveal something remarkable. The Pythagorean Theorem states that the sum of the areas of the squares on the two legs equals the area of the square on the hypotenuse. In other words: a squared plus b squared equals c squared. This beautiful relationship holds true for every right triangle!"
+          },
+          "parentId": "node_1762663576316_zuyi6qwch",
+          "childIds": [
+            "node_1762663576316_taa4tj7br"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663576316_taa4tj7br",
+        {
+          "id": "node_1762663576316_taa4tj7br",
+          "segment": {
+            "id": "segment_3",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Example 1: Solving Your First Triangle",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:46:16.316Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_3.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_3_thumbnail.png",
+            "title": "Example 1: Solving Your First Triangle",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's solve a practical example using the Pythagorean theorem. We have a right triangle with sides a equals 3 and b equals 4. We need to find the hypotenuse c. We apply the Pythagorean theorem: a squared plus b squared equals c squared. Substituting our values: 3 squared plus 4 squared equals c squared. That gives us 9 plus 16 equals 25, which equals c squared. Taking the square root, we find that c equals 5. This is a classic 3-4-5 right triangle! And there we have it, our complete solution."
+          },
+          "parentId": "node_1762663576316_kotxqs9kg",
+          "childIds": [
+            "node_1762663576316_9hzmp33ey"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663576316_9hzmp33ey",
+        {
+          "id": "node_1762663576316_9hzmp33ey",
+          "segment": {
+            "id": "segment_4",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Solving for a Leg Using Pythagorean Theorem",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:46:16.316Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_4.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_4_thumbnail.png",
+            "title": "Solving for a Leg Using Pythagorean Theorem",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's solve another example where we need to find the length of a leg instead of the hypotenuse. We have a right triangle where the hypotenuse c equals 13 and one leg b equals 5. We need to find the other leg a. Starting with the Pythagorean theorem, we rearrange to solve for a. Subtract b squared from both sides to isolate a squared. Now substitute our known values: 13 squared minus 5 squared. That gives us 169 minus 25 equals 144. Taking the square root, we find that a equals 12."
+          },
+          "parentId": "node_1762663576316_taa4tj7br",
+          "childIds": [
+            "node_1762663576316_eoz0lzwlf"
+          ],
+          "branchIndex": 0
+        }
+      ],
+      [
+        "node_1762663576316_eoz0lzwlf",
+        {
+          "id": "node_1762663576316_eoz0lzwlf",
+          "segment": {
+            "id": "segment_5",
+            "manimCode": "",
+            "duration": 30,
+            "hasQuestion": false,
+            "topic": "Pythagorean Theorem Recap and Key Takeaways",
+            "difficulty": "medium",
+            "generatedAt": "2025-11-09T04:46:16.316Z",
+            "videoUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_5.mp4",
+            "thumbnailUrl": "https://storage.googleapis.com/vid-gen-static/91c80cc1-f771-4db9-9a95-a9ac3da6e539/section_5_thumbnail.png",
+            "title": "Pythagorean Theorem Recap and Key Takeaways",
+            "renderingStatus": "completed",
+            "voiceoverScript": "Let's recap the Pythagorean Theorem and why it's so powerful. For any right triangle, the square of the hypotenuse equals the sum of squares of the other two sides. The formula a squared plus b squared equals c squared is fundamental to geometry and trigonometry. This theorem is essential for distance calculations, construction, engineering, navigation, and countless applications in physics and mathematics. A simple yet powerful relationship that has shaped our understanding of space for over two thousand years."
+          },
+          "parentId": "node_1762663576316_9hzmp33ey",
+          "childIds": [],
+          "branchIndex": 0
+        }
+      ]
+    ],
+    "rootIds": [
+      "node_1762663576316_zuyi6qwch"
+    ],
+    "currentNodeId": "node_1762663576316_zuyi6qwch"
+  },
+  "context": {
+    "initialTopic": "Pythagoras Theorem",
+    "historyTopics": [
+      "Pythagoras Theorem"
+    ],
+    "depth": 5,
+    "correctnessPattern": [],
+    "preferredStyle": "mixed"
+  },
+  "sessionId": "cached_1762663576316",
+  "startedAt": "2025-11-09T04:46:16.316Z",
+  "lastUpdatedAt": "2025-11-09T04:46:16.316Z"
+}

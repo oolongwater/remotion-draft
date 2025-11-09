@@ -1,0 +1,16 @@
+{
+  "name": "cached-session-generator",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx generateCachedSessions.ts"
+  },
+  "dependencies": {
+    "undici": "^6.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
+

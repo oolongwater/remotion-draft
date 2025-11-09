@@ -18,6 +18,7 @@ import { QuizQuestionOverlay } from "./components/QuizQuestionOverlay";
 import { TreeExplorer } from "./components/TreeExplorer";
 import { TreeVisualizer } from "./components/TreeVisualizer";
 import { VideoController } from "./controllers/VideoController";
+import { loadCachedSession, hasCachedSession } from "./services/cachedSessionService";
 import { generateClosingQuestion } from "./services/llmService";
 import {
   getAllNodes,
@@ -137,11 +138,32 @@ export const App: React.FC = () => {
 
   /**
    * Handle topic submission from landing page
+   * Tries to load cached session first, then falls back to generating new session
    */
   const handleTopicSubmit = async (topic: string) => {
     resetClosingQuestionState();
     resetLeafQuestionState();
     setHasSeenFirstVideo(false); // Reset video tracking for new session
+
+    // Try to load cached session for this topic
+    if (hasCachedSession(topic)) {
+      console.log("Attempting to load cached session for:", topic);
+      const cached = await loadCachedSession(topic);
+      
+      if (cached) {
+        console.log("✅ Successfully loaded cached session for:", topic);
+        setCachedSession(cached);
+        setCurrentTopic(topic);
+        setIsTestMode(false);
+        setAppState("learning");
+        setError("");
+        return; // Successfully loaded cached session, skip generation
+      } else {
+        console.warn("Failed to load cached session, falling back to generation");
+      }
+    }
+
+    // No cached session available or failed to load - generate fresh
     clearVideoSession(); // Clear localStorage to force fresh generation
     setCachedSession(null); // Clear any cached session to force new generation
     setCurrentTopic(topic);
